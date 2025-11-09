@@ -1,6 +1,7 @@
 package mg.itu.framework.servlet;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,30 +14,18 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import itu.framework.annotations.MyController;
-import itu.framework.annotations.MyURL;
-
 @WebServlet("/")
 public class FrontController extends HttpServlet {
 
-    private static final String ROUTES_ATTRIBUTE = "framework.routes";
+    // Simple route table: url -> handler (class + method)
+    private final Map<String, MethodHandler> routes = new HashMap<>();
 
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
-        
-        // Lire le package de base depuis web.xml
-        String basePackage = config.getInitParameter("basePackage");
-        if (basePackage == null || basePackage.trim().isEmpty()) {
-            basePackage = "mg.itu.test.controller"; // valeur par defaut
-        }
-        
-        // Scanner et stocker dans ServletContext
-        Map<String, MethodHandler> routes = new HashMap<>();
-        scanControllersInPackage(basePackage, routes);
-        getServletContext().setAttribute(ROUTES_ATTRIBUTE, routes);
-        
-        System.out.println("Framework initialized. Found " + routes.size() + " route(s).");
+        // Scan a default controllers folder inside WEB-INF/classes
+        // You can change this path if your controllers are elsewhere
+        scanControllers("/WEB-INF/classes/mg/itu/test/controller/");
     }
 
     @Override
@@ -64,25 +53,39 @@ public class FrontController extends HttpServlet {
             return;
         }
 
-        // Recuperer les routes depuis ServletContext
-        @SuppressWarnings("unchecked")
-        Map<String, MethodHandler> routes = (Map<String, MethodHandler>) getServletContext()
-                .getAttribute(ROUTES_ATTRIBUTE);
-
-        // Verifier si l'URL correspond à une route
-        MethodHandler handler = routes != null ? routes.get(path) : null;
-        
-        response.setContentType("text/plain;charset=UTF-8");
-        
+        // Verifier table de routage
+        MethodHandler handler = routes.get(path);
         if (handler != null) {
-            // Afficher les informations sans invoquer
-            response.getWriter().println("URL trouvee : " + path);
-            response.getWriter().println("Classe : " + handler.clazz.getName());
-            response.getWriter().println("Methode : " + handler.method.getName());
-        } else {
-            // Pas de methode pour cette URL
-            response.getWriter().println("Pas de methode pour cette URL : " + path);
+            System.out.println("[FrontController] URL trouvee : " + path + " -> " 
+                + handler.clazz.getName() + "." + handler.method.getName());
+            try {
+                Object instance = handler.clazz.getDeclaredConstructor().newInstance();
+                Object ret = handler.method.invoke(instance);
+                
+                response.setContentType("text/plain;charset=UTF-8");
+                
+                // Verifier si la methode renvoie une String
+                if (ret instanceof String) {
+                    System.out.println("[FrontController] Methode invoquee avec succes, retour String");
+                    // Stocker le resultat dans request et forward vers JSP
+                    request.setAttribute("result", ret);
+                    request.getRequestDispatcher("/WEB-INF/views/result.jsp").forward(request, response);
+                } else {
+                    System.out.println("[FrontController] La methode ne retourne pas un String");
+                    response.sendError(HttpServletResponse.SC_NOT_FOUND, "Methode non supportee");
+                }
+                return;
+            } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+                    | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+                System.err.println("[FrontController] Erreur lors de l'invocation : " + e.getMessage());
+                e.printStackTrace();
+                throw new ServletException("Erreur lors de l'invocation du handler", e);
+            }
         }
+
+        // Default fallback
+        System.out.println("[FrontController] Aucune route pour : " + path);
+        response.sendError(HttpServletResponse.SC_NOT_FOUND, "Pas de methode pour cette URL");
     }
 
     private boolean isStaticResource(String path) {
@@ -93,26 +96,22 @@ public class FrontController extends HttpServlet {
     }
 
     /**
-     * Scans the given package for classes annotated with @MyController,
-     * then scans their methods for @MyURL annotations and populates the routes map.
-     */
-    private void scanControllersInPackage(String basePackage, Map<String, MethodHandler> routes) {
-        String packagePath = "/WEB-INF/classes/" + basePackage.replace('.', '/') + "/";
-        scanControllersRecursive(packagePath, routes);
-    }
-
-    /**
      * Scans the given webapp classes directory path for .class files, builds
-     * fully-qualified class names and inspects methods annotated with @MyURL.
+     * fully-qualified class names and inspects methods annotated with
+     * itu.framework.annotations.MyURL to populate the routes map.
+     *
+     * This is a minimal implementation that works when classes are exploded
+     * under WEB-INF/classes. If your controllers are packaged differently
+     * (in jars), you should extend this logic.
      */
-    private void scanControllersRecursive(String classesFolderPath, Map<String, MethodHandler> routes) {
+    private void scanControllers(String classesFolderPath) {
         try {
             Set<String> paths = getServletContext().getResourcePaths(classesFolderPath);
             if (paths == null) return;
             for (String p : paths) {
                 if (p.endsWith("/")) {
                     // recursive scan subfolders
-                    scanControllersRecursive(p, routes);
+                    scanControllers(p);
                 } else if (p.endsWith(".class")) {
                     // build class name from path
                     String prefix = "/WEB-INF/classes/";
@@ -120,21 +119,13 @@ public class FrontController extends HttpServlet {
                     String className = p.substring(prefix.length(), p.length() - 6).replace('/', '.');
                     try {
                         Class<?> cls = Class.forName(className);
-                        
-                        // Verifier si la classe est annotee avec @MyController
-                        if (!cls.isAnnotationPresent(MyController.class)) {
-                            continue;
-                        }
-                        
-                        // Scanner les methodes de cette classe
                         for (Method m : cls.getDeclaredMethods()) {
-                            if (m.isAnnotationPresent(MyURL.class)) {
-                                MyURL ann = m.getAnnotation(MyURL.class);
+                            if (m.isAnnotationPresent(itu.framework.annotations.MyURL.class)) {
+                                itu.framework.annotations.MyURL ann = m
+                                        .getAnnotation(itu.framework.annotations.MyURL.class);
                                 String url = ann.value();
                                 if (!url.startsWith("/")) url = "/" + url;
                                 routes.put(url, new MethodHandler(cls, m));
-                                System.out.println("  Route ajoutee : " + url + " -> " 
-                                    + cls.getSimpleName() + "." + m.getName());
                             }
                         }
                     } catch (ClassNotFoundException e) {

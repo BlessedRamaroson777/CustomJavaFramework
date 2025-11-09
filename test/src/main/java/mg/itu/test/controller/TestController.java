@@ -11,12 +11,13 @@ public class TestController {
     
     @MyURL("/index")
     public String index() {
+        System.out.println("[TestController] index() appelee");
         return "Hello from Test Controller!";
     }
     
     @MyURL("/test")
     public String test() {
-        // return "Test method called!";
+        System.out.println("[TestController] test() appelee");
         List<Class<?>> controllers = ControllerScanner.findControllersInClassPath(ControllerScanner.class);
         StringBuilder sb = new StringBuilder();
 
@@ -32,4 +33,21 @@ public class TestController {
         return sb.toString();
     }
     
+    @MyURL("/hello")
+    public String hello() {
+        System.out.println("[TestController] hello() appelee");
+        return "Hello World!";
+    }
+    
+    @MyURL("/void-test")
+    public void voidMethod() {
+        System.out.println("[TestController] voidMethod() appelee - ne retourne rien");
+    }
+    
+    @MyURL("/integer-test")
+    public Integer integerMethod() {
+        System.out.println("[TestController] integerMethod() appelee - retourne un Integer");
+        return 42;
+    }
+
 }
