@@ -47,36 +47,45 @@ public class FrontController extends HttpServlet {
         String contextPath = request.getContextPath();
         String path = uri.substring(contextPath.length());
 
-        // Vérifier si c'est une ressource statique (js, css, html, etc.)
+        // Verifier si c'est une ressource statique (js, css, html, etc.)
         if (isStaticResource(path)) {
             request.getRequestDispatcher(path).forward(request, response);
             return;
         }
 
-        // Vérifier table de routage
+        // Verifier table de routage
         MethodHandler handler = routes.get(path);
         if (handler != null) {
+            System.out.println("[FrontController] URL trouvee : " + path + " -> " 
+                + handler.clazz.getName() + "." + handler.method.getName());
             try {
                 Object instance = handler.clazz.getDeclaredConstructor().newInstance();
                 Object ret = handler.method.invoke(instance);
-                // Si la méthode renvoie une String, l'afficher ; sinon afficher OK
+                
                 response.setContentType("text/plain;charset=UTF-8");
+                
+                // Verifier si la methode renvoie une String
                 if (ret instanceof String) {
-                    response.getWriter().write((String) ret);
+                    System.out.println("[FrontController] Methode invoquee avec succes, retour String");
+                    // Stocker le resultat dans request et forward vers JSP
+                    request.setAttribute("result", ret);
+                    request.getRequestDispatcher("/WEB-INF/views/result.jsp").forward(request, response);
                 } else {
-                    response.getWriter().write("OK - invoked " + handler.method.getName());
+                    System.out.println("[FrontController] La methode ne retourne pas un String");
+                    response.sendError(HttpServletResponse.SC_NOT_FOUND, "Methode non supportee");
                 }
                 return;
             } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
                     | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+                System.err.println("[FrontController] Erreur lors de l'invocation : " + e.getMessage());
+                e.printStackTrace();
                 throw new ServletException("Erreur lors de l'invocation du handler", e);
             }
         }
 
         // Default fallback
-        response.setContentType("text/html");
-        response.getWriter().println("<h1>Framework Controller</h1>");
-        response.getWriter().println("<p>Path: " + path + "</p>");
+        System.out.println("[FrontController] Aucune route pour : " + path);
+        response.sendError(HttpServletResponse.SC_NOT_FOUND, "Pas de methode pour cette URL");
     }
 
     private boolean isStaticResource(String path) {
