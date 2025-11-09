@@ -6,8 +6,10 @@ import itu.framework.annotations.MyController;
 import itu.framework.annotations.MyURL;
 import itu.framework.scan.ControllerScanner;
 
+@MyController("TestController")
 public class TestController {
     
+    @MyURL("/index")
     public String index() {
         return "Hello from Test Controller!";
     }
@@ -29,5 +31,5 @@ public class TestController {
 
         return sb.toString();
     }
-
+    
 }
