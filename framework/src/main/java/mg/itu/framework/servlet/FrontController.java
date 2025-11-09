@@ -14,6 +14,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import mg.itu.framework.ModelView;
+
 @WebServlet("/")
 public class FrontController extends HttpServlet {
 
@@ -62,16 +64,26 @@ public class FrontController extends HttpServlet {
                 Object instance = handler.clazz.getDeclaredConstructor().newInstance();
                 Object ret = handler.method.invoke(instance);
                 
-                response.setContentType("text/plain;charset=UTF-8");
-                
-                // Verifier si la methode renvoie une String
-                if (ret instanceof String) {
+                // Verifier le type de retour
+                if (ret instanceof ModelView) {
+                    System.out.println("[FrontController] Methode invoquee avec succes, retour ModelView");
+                    ModelView mv = (ModelView) ret;
+                    String viewPath = "/WEB-INF/views/" + mv.getView();
+                    
+                    // Verifier si la page JSP existe
+                    if (getServletContext().getResource(viewPath) == null) {
+                        System.out.println("[FrontController] Page JSP introuvable : " + viewPath);
+                        response.sendError(HttpServletResponse.SC_NOT_FOUND, "Page JSP introuvable : " + mv.getView());
+                    } else {
+                        request.getRequestDispatcher(viewPath).forward(request, response);
+                    }
+                } else if (ret instanceof String) {
                     System.out.println("[FrontController] Methode invoquee avec succes, retour String");
                     // Stocker le resultat dans request et forward vers JSP
                     request.setAttribute("result", ret);
                     request.getRequestDispatcher("/WEB-INF/views/result.jsp").forward(request, response);
                 } else {
-                    System.out.println("[FrontController] La methode ne retourne pas un String");
+                    System.out.println("[FrontController] La methode ne retourne pas un String ou ModelView");
                     response.sendError(HttpServletResponse.SC_NOT_FOUND, "Methode non supportee");
                 }
                 return;

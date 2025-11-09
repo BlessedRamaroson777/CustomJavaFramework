@@ -5,6 +5,7 @@ import java.util.List;
 import itu.framework.annotations.MyController;
 import itu.framework.annotations.MyURL;
 import itu.framework.scan.ControllerScanner;
+import mg.itu.framework.ModelView;
 
 @MyController("TestController")
 public class TestController {
@@ -33,21 +34,25 @@ public class TestController {
         return sb.toString();
     }
     
-    @MyURL("/hello")
-    public String hello() {
-        System.out.println("[TestController] hello() appelee");
-        return "Hello World!";
-    }
-    
     @MyURL("/void-test")
     public void voidMethod() {
         System.out.println("[TestController] voidMethod() appelee - ne retourne rien");
     }
     
-    @MyURL("/integer-test")
-    public Integer integerMethod() {
-        System.out.println("[TestController] integerMethod() appelee - retourne un Integer");
-        return 42;
+    @MyURL("/page-test")
+    public ModelView pageTest() {
+        System.out.println("[TestController] pageTest() appelee - retourne ModelView");
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        return mv;
+    }
+    
+    @MyURL("/page-inexistante")
+    public ModelView pageInexistante() {
+        System.out.println("[TestController] pageInexistante() appelee - retourne ModelView avec page qui existe pas");
+        ModelView mv = new ModelView();
+        mv.setView("pagetrouvable.jsp");
+        return mv;
     }
 
 }
