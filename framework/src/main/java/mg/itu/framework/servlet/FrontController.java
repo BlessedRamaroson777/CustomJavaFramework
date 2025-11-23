@@ -6,6 +6,10 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -19,8 +23,8 @@ import mg.itu.framework.ModelView;
 @WebServlet("/")
 public class FrontController extends HttpServlet {
 
-    // Simple route table: url -> handler (class + method)
-    private final Map<String, MethodHandler> routes = new HashMap<>();
+    // Route entries supporting patterns with placeholders like /users/{id}
+    private final List<RouteEntry> routeEntries = new ArrayList<>();
 
     @Override
     public void init(ServletConfig config) throws ServletException {
@@ -55,12 +59,42 @@ public class FrontController extends HttpServlet {
             return;
         }
 
-        // Verifier table de routage
-        MethodHandler handler = routes.get(path);
+        // Find a matching route (supporting patterns with {param})
+        MethodHandler handler = null;
+        Map<String,String> pathParams = new HashMap<>();
+        for (RouteEntry re : routeEntries) {
+            Matcher m = re.pattern.matcher(path);
+            if (m.matches()) {
+                handler = re.handler;
+                // extract groups into pathParams by name
+                for (int i = 0; i < re.paramNames.size(); i++) {
+                    String val = m.group(i + 1);
+                    String name = re.paramNames.get(i);
+                    pathParams.put(name, val);
+                }
+                break;
+            }
+        }
+
         if (handler != null) {
             System.out.println("[FrontController] URL trouvee : " + path + " -> " 
                 + handler.clazz.getName() + "." + handler.method.getName());
             try {
+                // expose path parameters (from {name} placeholders) as request attributes
+                if (!pathParams.isEmpty()) {
+                    for (Map.Entry<String,String> pe : pathParams.entrySet()) {
+                        String pname = pe.getKey();
+                        String pval = pe.getValue();
+                        // if the segment is the literal string "null" or empty, do not set the attribute
+                        if (pval != null && !"null".equals(pval) && !pval.isEmpty()) {
+                            request.setAttribute(pname, pval);
+                            System.out.println("[FrontController] Path param set: " + pname + " = " + pval);
+                        } else {
+                            System.out.println("[FrontController] Path param '" + pname + "' ignored (value='" + pval + "')");
+                        }
+                    }
+                }
+
                 Object instance = handler.clazz.getDeclaredConstructor().newInstance();
                 Object ret = handler.method.invoke(instance);
                 
@@ -82,21 +116,28 @@ public class FrontController extends HttpServlet {
                                 // try next
                             }
                         }
-                        if (getter != null) {
-                            Object mapObj = getter.invoke(mv);
-                            if (mapObj instanceof Map) {
-                                for (Object objEntry : ((Map<?, ?>) mapObj).entrySet()) {
-                                    Map.Entry<?, ?> e = (Map.Entry<?, ?>) objEntry;
-                                    if (e.getKey() != null) request.setAttribute(e.getKey().toString(), e.getValue());
+                                if (getter != null) {
+                                    Object mapObj = getter.invoke(mv);
+                                    if (mapObj instanceof Map) {
+                                        for (Object objEntry : ((Map<?, ?>) mapObj).entrySet()) {
+                                            Map.Entry<?, ?> e = (Map.Entry<?, ?>) objEntry;
+                                            if (e.getKey() != null) {
+                                                request.setAttribute(e.getKey().toString(), e.getValue());
+                                                // debug log
+                                                System.out.println("[FrontController] Model attribute set: " + e.getKey() + " = " + e.getValue());
+                                            }
+                                        }
+                                        // Also expose the whole map as a request attribute so JSPs can iterate over it
+                                        request.setAttribute("mapData", mapObj);
+                                        System.out.println("[FrontController] mapData attribute exposed to JSP (size=" + ((Map<?,?>)mapObj).size() + ")");
+                                    }
                                 }
-                                // Also expose the whole map as a request attribute so JSPs can iterate over it
-                                request.setAttribute("mapData", mapObj);
-                            }
-                        }
                     } catch (Exception e) {
                         // Log and continue without model data
                         e.printStackTrace();
                     }
+
+                    
 
                     // Verifier si la page JSP existe
                     if (getServletContext().getResource(viewPath) == null) {
@@ -168,7 +209,32 @@ public class FrontController extends HttpServlet {
                                         .getAnnotation(itu.framework.annotations.MyURL.class);
                                 String url = ann.value();
                                 if (!url.startsWith("/")) url = "/" + url;
-                                routes.put(url, new MethodHandler(cls, m));
+                                // convert URL pattern with {param} into a regex and collect param names
+                                List<String> paramNames = new ArrayList<>();
+                                StringBuilder regex = new StringBuilder();
+                                int i = 0;
+                                while (i < url.length()) {
+                                    char c = url.charAt(i);
+                                    if (c == '{') {
+                                        int end = url.indexOf('}', i);
+                                        if (end > i) {
+                                            String name = url.substring(i + 1, end);
+                                            paramNames.add(name);
+                                            regex.append("([^/]+)");
+                                            i = end + 1;
+                                            continue;
+                                        }
+                                    }
+                                    // escape regex special chars for safety
+                                    if (".[](){}+?^$\\|".indexOf(c) >= 0) {
+                                        regex.append('\\').append(c);
+                                    } else {
+                                        regex.append(c);
+                                    }
+                                    i++;
+                                }
+                                Pattern compiled = Pattern.compile("^" + regex.toString() + "$");
+                                routeEntries.add(new RouteEntry(compiled, paramNames, new MethodHandler(cls, m)));
                             }
                         }
                     } catch (ClassNotFoundException e) {
@@ -189,6 +255,18 @@ public class FrontController extends HttpServlet {
         MethodHandler(Class<?> clazz, Method method) {
             this.clazz = clazz;
             this.method = method;
+        }
+    }
+
+    private static class RouteEntry {
+        final Pattern pattern;
+        final List<String> paramNames;
+        final MethodHandler handler;
+
+        RouteEntry(Pattern pattern, List<String> paramNames, MethodHandler handler) {
+            this.pattern = pattern;
+            this.paramNames = paramNames;
+            this.handler = handler;
         }
     }
 }
