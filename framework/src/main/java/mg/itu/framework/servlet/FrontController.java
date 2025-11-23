@@ -59,104 +59,36 @@ public class FrontController extends HttpServlet {
             return;
         }
 
-        // Find a matching route (supporting patterns with {param})
-        MethodHandler handler = null;
-        Map<String,String> pathParams = new HashMap<>();
-        for (RouteEntry re : routeEntries) {
-            Matcher m = re.pattern.matcher(path);
-            if (m.matches()) {
-                handler = re.handler;
-                // extract groups into pathParams by name
-                for (int i = 0; i < re.paramNames.size(); i++) {
-                    String val = m.group(i + 1);
-                    String name = re.paramNames.get(i);
-                    pathParams.put(name, val);
-                }
-                break;
-            }
-        }
-
-        if (handler != null) {
-            System.out.println("[FrontController] URL trouvee : " + path + " -> " 
-                + handler.clazz.getName() + "." + handler.method.getName());
+        // Find route and invoke handler if any
+        RouteMatch match = findRoute(path);
+        if (match != null) {
+            MethodHandler mh = match.handler;
+            Map<String,String> pathParams = match.pathParams;
+            System.out.println("[FrontController] URL trouvee : " + path + " -> " + mh.clazz.getName() + "." + mh.method.getName());
             try {
-                // expose path parameters (from {name} placeholders) as request attributes
-                if (!pathParams.isEmpty()) {
-                    for (Map.Entry<String,String> pe : pathParams.entrySet()) {
-                        String pname = pe.getKey();
-                        String pval = pe.getValue();
-                        // if the segment is the literal string "null" or empty, do not set the attribute
-                        if (pval != null && !"null".equals(pval) && !pval.isEmpty()) {
-                            request.setAttribute(pname, pval);
-                            System.out.println("[FrontController] Path param set: " + pname + " = " + pval);
-                        } else {
-                            System.out.println("[FrontController] Path param '" + pname + "' ignored (value='" + pval + "')");
-                        }
-                    }
-                }
+                // expose path params before invocation
+                setPathParamsToRequest(pathParams, request);
 
-                Object instance = handler.clazz.getDeclaredConstructor().newInstance();
-                Object ret = handler.method.invoke(instance);
-                
-                // Verifier le type de retour
+                Object instance = mh.clazz.getDeclaredConstructor().newInstance();
+                Object[] args = prepareMethodArgs(mh.method, match.paramNames, pathParams, request);
+                Object ret = mh.method.invoke(instance, args);
+
+                // handle return types
                 if (ret instanceof ModelView) {
-                    System.out.println("[FrontController] Methode invoquee avec succes, retour ModelView");
                     ModelView mv = (ModelView) ret;
+                    copyModelToRequest(mv, request);
                     String viewPath = "/WEB-INF/views/" + mv.getView();
-
-                    // copier les données du ModelView dans les attributs de la requête
-                    try {
-                        java.lang.reflect.Method getter = null;
-                        String[] candidates = {"getMapData", "getmapData", "getMaqData"};
-                        for (String name : candidates) {
-                            try {
-                                getter = mv.getClass().getMethod(name);
-                                break;
-                            } catch (NoSuchMethodException nsme) {
-                                // try next
-                            }
-                        }
-                                if (getter != null) {
-                                    Object mapObj = getter.invoke(mv);
-                                    if (mapObj instanceof Map) {
-                                        for (Object objEntry : ((Map<?, ?>) mapObj).entrySet()) {
-                                            Map.Entry<?, ?> e = (Map.Entry<?, ?>) objEntry;
-                                            if (e.getKey() != null) {
-                                                request.setAttribute(e.getKey().toString(), e.getValue());
-                                                // debug log
-                                                System.out.println("[FrontController] Model attribute set: " + e.getKey() + " = " + e.getValue());
-                                            }
-                                        }
-                                        // Also expose the whole map as a request attribute so JSPs can iterate over it
-                                        request.setAttribute("mapData", mapObj);
-                                        System.out.println("[FrontController] mapData attribute exposed to JSP (size=" + ((Map<?,?>)mapObj).size() + ")");
-                                    }
-                                }
-                    } catch (Exception e) {
-                        // Log and continue without model data
-                        e.printStackTrace();
-                    }
-
-                    
-
-                    // Verifier si la page JSP existe
                     if (getServletContext().getResource(viewPath) == null) {
-                        System.out.println("[FrontController] Page JSP introuvable : " + viewPath);
                         response.sendError(HttpServletResponse.SC_NOT_FOUND, "Page JSP introuvable : " + mv.getView());
                     } else {
-                        // utiliser le context dispatcher pour eviter recursion
                         getServletContext().getRequestDispatcher(viewPath).forward(request, response);
                     }
                 } else if (ret instanceof String) {
-                    System.out.println("[FrontController] Methode invoquee avec succes, retour String");
-                    // Stocker le resultat dans request et forward vers JSP
                     request.setAttribute("result", ret);
                     request.getRequestDispatcher("/WEB-INF/views/result.jsp").forward(request, response);
                 } else {
                     String retType = (ret == null) ? "null" : ret.getClass().getName();
-                    System.out.println("[FrontController] La methode ne retourne pas un String ou ModelView (type: " + retType + ")");
-                    response.sendError(HttpServletResponse.SC_NOT_FOUND,
-                            "Methode non supportee: type de retour = " + retType);
+                    response.sendError(HttpServletResponse.SC_NOT_FOUND, "Methode non supportee: type de retour = " + retType);
                 }
                 return;
             } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
@@ -267,6 +199,168 @@ public class FrontController extends HttpServlet {
             this.pattern = pattern;
             this.paramNames = paramNames;
             this.handler = handler;
+        }
+    }
+
+    // Utility to convert a String to the requested parameter type (primitive or wrapper or String)
+    private Object convertStringToType(String s, Class<?> type) {
+        if (type == String.class) return s;
+        if (type == int.class || type == Integer.class) return Integer.valueOf(Integer.parseInt(s));
+        if (type == long.class || type == Long.class) return Long.valueOf(Long.parseLong(s));
+        if (type == boolean.class || type == Boolean.class) return Boolean.valueOf(Boolean.parseBoolean(s));
+        if (type == double.class || type == Double.class) return Double.valueOf(Double.parseDouble(s));
+        if (type == float.class || type == Float.class) return Float.valueOf(Float.parseFloat(s));
+        if (type == short.class || type == Short.class) return Short.valueOf(Short.parseShort(s));
+        if (type == byte.class || type == Byte.class) return Byte.valueOf(Byte.parseByte(s));
+        if (type == char.class || type == Character.class) return s.length() > 0 ? Character.valueOf(s.charAt(0)) : Character.valueOf('\u0000');
+        // For other types, no conversion supported — return null
+        return null;
+    }
+
+    // Helper: result of matching a route
+    private static class RouteMatch {
+        final MethodHandler handler;
+        final Map<String,String> pathParams;
+        final List<String> paramNames;
+
+        RouteMatch(MethodHandler handler, Map<String,String> pathParams, List<String> paramNames) {
+            this.handler = handler;
+            this.pathParams = pathParams;
+            this.paramNames = paramNames;
+        }
+    }
+
+    // Find the first matching route for the path and return extracted params
+    private RouteMatch findRoute(String path) {
+        for (RouteEntry re : routeEntries) {
+            Matcher m = re.pattern.matcher(path);
+            if (m.matches()) {
+                Map<String,String> params = new HashMap<>();
+                for (int i = 0; i < re.paramNames.size(); i++) {
+                    String val = m.group(i + 1);
+                    String name = re.paramNames.get(i);
+                    params.put(name, val);
+                }
+                return new RouteMatch(re.handler, params, re.paramNames);
+            }
+        }
+        return null;
+    }
+
+    private void setPathParamsToRequest(Map<String,String> pathParams, HttpServletRequest request) {
+        if (pathParams == null || pathParams.isEmpty()) return;
+        for (Map.Entry<String,String> pe : pathParams.entrySet()) {
+            String pname = pe.getKey();
+            String pval = pe.getValue();
+            if (pval != null && !"null".equals(pval) && !pval.isEmpty()) {
+                request.setAttribute(pname, pval);
+                System.out.println("[FrontController] Path param set: " + pname + " = " + pval);
+            } else {
+                System.out.println("[FrontController] Path param '" + pname + "' ignored (value='" + pval + "')");
+            }
+        }
+    }
+
+    private Object[] prepareMethodArgs(Method method, List<String> paramNames, Map<String,String> pathParams, HttpServletRequest request) {
+        java.lang.reflect.Parameter[] params = method.getParameters();
+        Object[] args = new Object[params.length];
+        // track which request parameter names we've consumed in the heuristic fallback
+        java.util.Set<String> consumedRequestParams = new java.util.HashSet<>();
+        for (int pi = 0; pi < params.length; pi++) {
+            java.lang.reflect.Parameter p = params[pi];
+            String pname = p.getName();
+            String sval = null;
+            // If parameter is annotated with @ReqParam, use its value as the key
+            itu.framework.annotations.ReqParam reqAnn = p.getAnnotation(itu.framework.annotations.ReqParam.class);
+            if (reqAnn != null) {
+                String key = reqAnn.value();
+                // prefer path param then request param
+                if (pathParams != null && pathParams.containsKey(key)) sval = pathParams.get(key);
+                if (sval == null) sval = request.getParameter(key);
+            } else {
+                if (pathParams != null && pathParams.containsKey(pname)) sval = pathParams.get(pname);
+                if (sval == null) sval = request.getParameter(pname);
+            }
+            // fallback: if parameter name not available (compiled without -parameters),
+            // use the route param order: if paramNames list contains an entry at this index, use it
+            if ((sval == null || "null".equals(sval) || sval.isEmpty()) && paramNames != null && pi < paramNames.size()) {
+                String pn = paramNames.get(pi);
+                if (pathParams != null && pathParams.containsKey(pn)) {
+                    sval = pathParams.get(pn);
+                }
+            }
+            // Further fallback: try to match request parameters heuristically by type
+            if ((sval == null || "null".equals(sval) || sval.isEmpty())) {
+                java.util.Map<String,String[]> rpm = request.getParameterMap();
+                for (String rpName : rpm.keySet()) {
+                    if (consumedRequestParams.contains(rpName)) continue;
+                    String candidate = request.getParameter(rpName);
+                    if (candidate == null) continue;
+                    Object converted = null;
+                    try {
+                        converted = convertStringToType(candidate, p.getType());
+                    } catch (Exception ex) {
+                        converted = null;
+                    }
+                    if (converted != null) {
+                        sval = candidate;
+                        consumedRequestParams.add(rpName);
+                        break;
+                    }
+                }
+            }
+            Class<?> ptype = p.getType();
+            Object aval = null;
+            if (sval != null && !"null".equals(sval) && !sval.isEmpty()) {
+                try {
+                    aval = convertStringToType(sval, ptype);
+                } catch (Exception ex) {
+                    System.out.println("[FrontController] Warning: cannot convert parameter '" + pname + "' value='" + sval + "' to " + ptype.getName());
+                    aval = null;
+                }
+            } else {
+                if (ptype.isPrimitive()) {
+                    if (ptype == boolean.class) aval = Boolean.FALSE;
+                    else if (ptype == char.class) aval = Character.valueOf('\u0000');
+                    else aval = Integer.valueOf(0);
+                } else {
+                    aval = null;
+                }
+            }
+            args[pi] = aval;
+            System.out.println("[FrontController] Resolved param '" + pname + "' -> " + args[pi]);
+        }
+        return args;
+    }
+
+    private void copyModelToRequest(ModelView mv, HttpServletRequest request) {
+        try {
+            java.lang.reflect.Method getter = null;
+            String[] candidates = {"getMapData", "getmapData", "getMaqData"};
+            for (String name : candidates) {
+                try {
+                    getter = mv.getClass().getMethod(name);
+                    break;
+                } catch (NoSuchMethodException nsme) {
+                    // try next
+                }
+            }
+            if (getter != null) {
+                Object mapObj = getter.invoke(mv);
+                if (mapObj instanceof Map) {
+                    for (Object objEntry : ((Map<?, ?>) mapObj).entrySet()) {
+                        Map.Entry<?, ?> e = (Map.Entry<?, ?>) objEntry;
+                        if (e.getKey() != null) {
+                            request.setAttribute(e.getKey().toString(), e.getValue());
+                            System.out.println("[FrontController] Model attribute set: " + e.getKey() + " = " + e.getValue());
+                        }
+                    }
+                    request.setAttribute("mapData", mapObj);
+                    System.out.println("[FrontController] mapData attribute exposed to JSP (size=" + ((Map<?,?>)mapObj).size() + ")");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
