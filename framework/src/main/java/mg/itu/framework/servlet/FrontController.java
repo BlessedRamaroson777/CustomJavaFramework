@@ -69,13 +69,42 @@ public class FrontController extends HttpServlet {
                     System.out.println("[FrontController] Methode invoquee avec succes, retour ModelView");
                     ModelView mv = (ModelView) ret;
                     String viewPath = "/WEB-INF/views/" + mv.getView();
-                    
+
+                    // copier les données du ModelView dans les attributs de la requête
+                    try {
+                        java.lang.reflect.Method getter = null;
+                        String[] candidates = {"getMapData", "getmapData", "getMaqData"};
+                        for (String name : candidates) {
+                            try {
+                                getter = mv.getClass().getMethod(name);
+                                break;
+                            } catch (NoSuchMethodException nsme) {
+                                // try next
+                            }
+                        }
+                        if (getter != null) {
+                            Object mapObj = getter.invoke(mv);
+                            if (mapObj instanceof Map) {
+                                for (Object objEntry : ((Map<?, ?>) mapObj).entrySet()) {
+                                    Map.Entry<?, ?> e = (Map.Entry<?, ?>) objEntry;
+                                    if (e.getKey() != null) request.setAttribute(e.getKey().toString(), e.getValue());
+                                }
+                                // Also expose the whole map as a request attribute so JSPs can iterate over it
+                                request.setAttribute("mapData", mapObj);
+                            }
+                        }
+                    } catch (Exception e) {
+                        // Log and continue without model data
+                        e.printStackTrace();
+                    }
+
                     // Verifier si la page JSP existe
                     if (getServletContext().getResource(viewPath) == null) {
                         System.out.println("[FrontController] Page JSP introuvable : " + viewPath);
                         response.sendError(HttpServletResponse.SC_NOT_FOUND, "Page JSP introuvable : " + mv.getView());
                     } else {
-                        request.getRequestDispatcher(viewPath).forward(request, response);
+                        // utiliser le context dispatcher pour eviter recursion
+                        getServletContext().getRequestDispatcher(viewPath).forward(request, response);
                     }
                 } else if (ret instanceof String) {
                     System.out.println("[FrontController] Methode invoquee avec succes, retour String");
@@ -83,8 +112,10 @@ public class FrontController extends HttpServlet {
                     request.setAttribute("result", ret);
                     request.getRequestDispatcher("/WEB-INF/views/result.jsp").forward(request, response);
                 } else {
-                    System.out.println("[FrontController] La methode ne retourne pas un String ou ModelView");
-                    response.sendError(HttpServletResponse.SC_NOT_FOUND, "Methode non supportee");
+                    String retType = (ret == null) ? "null" : ret.getClass().getName();
+                    System.out.println("[FrontController] La methode ne retourne pas un String ou ModelView (type: " + retType + ")");
+                    response.sendError(HttpServletResponse.SC_NOT_FOUND,
+                            "Methode non supportee: type de retour = " + retType);
                 }
                 return;
             } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
