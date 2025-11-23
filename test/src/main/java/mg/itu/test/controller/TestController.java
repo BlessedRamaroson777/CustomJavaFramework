@@ -99,4 +99,40 @@ public class TestController {
         return mv;
     }
 
+    @MyURL("/etudiant/{id}")
+    public ModelView etudiant(int id) {
+        System.out.println("[TestController] etudiant() appelee avec id=" + id);
+        // 6 - Page fiche détail étudiant : /etudiant/{id}
+        ModelView mv = new ModelView();
+        mv.setView("etudiant.jsp");
+        mv.addData("studentId", id);
+        mv.addData("message", "Fiche detail etudiant pour id=" + id);
+        return mv;
+    }
+
+    @MyURL("/etudiant/params")
+    // etudiant/params?id=2&name=Alice
+    public ModelView etudiantParams(@itu.framework.annotations.ReqParam("id") Integer id,
+                                     @itu.framework.annotations.ReqParam("name") String name) {
+        // 6 bis - request parameters mapping by name
+        System.out.println("[TestController] etudiantParams() appelee avec id=" + id + " name=" + name);
+        ModelView mv = new ModelView();
+        mv.setView("etudiant_params.jsp");
+        mv.addData("idParam", id);
+        mv.addData("nameParam", name);
+        mv.addData("note", "Les request parameters sont mapp&eacute;s si leur nom correspond au nom de l'argument");
+        return mv;
+    }
+
+    @MyURL("/etudiant/tier/{id}")
+    public ModelView etudiantTier(int id) {
+        // 6 tier - demonstrate /etudiant/{id} mapping (separate page)
+        System.out.println("[TestController] etudiantTier() appelee avec id=" + id);
+        ModelView mv = new ModelView();
+        mv.setView("etudiant_tier.jsp");
+        mv.addData("studentId", id);
+        mv.addData("message", "(6 tier) Fiche detail etudiant pour id=" + id);
+        return mv;
+    }
+
 }
