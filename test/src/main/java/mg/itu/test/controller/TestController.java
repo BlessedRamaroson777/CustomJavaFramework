@@ -110,8 +110,8 @@ public class TestController {
         return mv;
     }
 
-    @MyURL("/etudiant/params")
     // etudiant/params?id=2&name=Alice
+    @MyURL("/etudiant/params")
     public ModelView etudiantParams(@itu.framework.annotations.ReqParam("id") Integer id,
                                      @itu.framework.annotations.ReqParam("name") String name) {
         // 6 bis - request parameters mapping by name
