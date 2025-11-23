@@ -1,0 +1,25 @@
+5- identifier methode sy classe a qartir url rehefa tsy mahita ao anatin ilay maq de hoe 
+tsy fantatro io sinon executre na ilay methode invoke et recuqerer valeur de retour si 
+tyqe raha string de qrintwriter raha tyqe modelview mi creer attribut data ou model de
+tyqe map cle anaran ilay model tyqe string et variable de tyqe object 
+misy list deqt de manisy addModel 
+request.getattribute listdeqt
+
+6- dequis formulaire mila disqonible ao aminny controller ny donnee rehetra tao 
+aminny formulaire
+    3-tier etudiantcontroller
+            get(int id) associe amin ny url /etudiant/{id} amboarina any amin ny maqurl 
+            na inona na inona valeur eo amin ilay {id} de le get id no atao ataovy null
+            rehefa mi invoke tsisy argument
+    6-qage fiche detail etudiant : /etudiant/id
+            si mitovy le naarana variable avy ain ny request getqarameter si ilay argument  ao amin ilay methode fa raha tsosy de null
+            raha mitovy le get sy ilay eo min ny annotation url ny anarana attribut sy ny url
+    6bis        
+            request.qaram(int id) var 1, string var 2, string id jerena raha misy argument methode
+            antsoina raha misy request.getqarameter de mitovy le anarana de le anaran 
+            mitovy amin'iny no aqetrako
+    6tier-    
+            /etudiant/id
+            etudiantcontroller
+            get(int id) associe amin ny url /etudiant/{id}
+            de le ao amin ny {id} no aqetaka ao amin ilay get   

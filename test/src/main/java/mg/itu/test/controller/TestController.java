@@ -88,4 +88,15 @@ public class TestController {
         return mv;
     }
 
+    @MyURL("/users/{id}")
+    public ModelView userById() {
+        System.out.println("[TestController] userById() appelee - exemple de route avec {id}");
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        mv.addData("info", "Page utilisateur (exemple)");
+        // On peut ajouter d'autres données pour démonstration
+        mv.addData("note", "La valeur {id} sera exposée par FrontController en 'id' si présente");
+        return mv;
+    }
+
 }
