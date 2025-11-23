@@ -55,4 +55,37 @@ public class TestController {
         return mv;
     }
 
+    @MyURL("/page-with-data")
+    public ModelView pageWithData() {
+        System.out.println("[TestController] pageWithData() appelee - retourne ModelView avec des donnees");
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        // Use reflection to add data for compatibility with multiple ModelView variants
+        try {
+            java.lang.reflect.Method add = null;
+            // prefer addData(String,Object)
+            try {
+                add = mv.getClass().getMethod("addData", String.class, Object.class);
+            } catch (NoSuchMethodException ex) {
+                // try common overloads
+                try { add = mv.getClass().getMethod("addData", String.class, String.class); } catch (NoSuchMethodException e) {}
+                if (add == null) {
+                    try { add = mv.getClass().getMethod("addData", String.class, int.class); } catch (NoSuchMethodException e) {}
+                }
+            }
+            if (add != null) {
+                add.invoke(mv, "message", "Hello from TestController");
+                // if the available method takes int, wrap appropriately
+                if (add.getParameterTypes()[1] == int.class) {
+                    add.invoke(mv, "count", 42);
+                } else {
+                    add.invoke(mv, "count", Integer.valueOf(42));
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return mv;
+    }
+
 }
