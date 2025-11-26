@@ -9,4 +9,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 public @interface MyURL {
     String value() default "";
+    // Optional HTTP methods to accept for this route. Empty = accept any method.
+    String[] methods() default {};
 }
