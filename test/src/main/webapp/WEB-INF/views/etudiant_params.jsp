@@ -12,6 +12,14 @@
     <h2>Request parameters</h2>
     <p>idParam: <%= request.getAttribute("idParam") != null ? request.getAttribute("idParam") : "(aucun)" %></p>
     <p>nameParam: <%= request.getAttribute("nameParam") != null ? request.getAttribute("nameParam") : "(aucun)" %></p>
-    <p>Note: <%= request.getAttribute("note") %></p>
+    <%
+        java.util.Map bs = (java.util.Map) request.getAttribute("bindingSources");
+        String idSource = "(inconnu)";
+        String nameSource = "(inconnu)";
+        if (bs != null) {
+            Object o = bs.get("id"); if (o != null) idSource = o.toString();
+            Object o2 = bs.get("name"); if (o2 != null) nameSource = o2.toString();
+        }
+    %>
 </body>
 </html>

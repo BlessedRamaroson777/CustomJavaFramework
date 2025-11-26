@@ -5,7 +5,7 @@ import java.util.List;
 import itu.framework.annotations.MyController;
 import itu.framework.annotations.MyURL;
 import itu.framework.scan.ControllerScanner;
-import mg.itu.framework.ModelView;
+import itu.framework.ModelView;
 
 @MyController("TestController")
 public class TestController {
@@ -110,6 +110,10 @@ public class TestController {
         return mv;
     }
 
+<<<<<<< Updated upstream
+=======
+    @MyURL("/inona/params")
+>>>>>>> Stashed changes
     // etudiant/params?id=2&name=Alice
     @MyURL("/etudiant/params")
     public ModelView etudiantParams(@itu.framework.annotations.ReqParam("id") Integer id,
@@ -120,18 +124,18 @@ public class TestController {
         mv.setView("etudiant_params.jsp");
         mv.addData("idParam", id);
         mv.addData("nameParam", name);
-        mv.addData("note", "Les request parameters sont mapp&eacute;s si leur nom correspond au nom de l'argument");
         return mv;
     }
 
-    @MyURL("/etudiant/tier/{id}")
-    public ModelView etudiantTier(int id) {
-        // 6 tier - demonstrate /etudiant/{id} mapping (separate page)
-        System.out.println("[TestController] etudiantTier() appelee avec id=" + id);
+    @MyURL("/params2")
+    // etudiant/params?id=2&name=Alice
+    public ModelView etudiantParams2(Integer id, String name) {
+        // 6 bis - request parameters mapping by name
+        System.out.println("[TestController] etudiantParams() appelee avec id=" + id + " name=" + name);
         ModelView mv = new ModelView();
-        mv.setView("etudiant_tier.jsp");
-        mv.addData("studentId", id);
-        mv.addData("message", "(6 tier) Fiche detail etudiant pour id=" + id);
+        mv.setView("etudiant_param2.jsp");
+        mv.addData("idParam", id);
+        mv.addData("nameParam", name);
         return mv;
     }
 

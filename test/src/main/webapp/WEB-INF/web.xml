@@ -8,7 +8,7 @@
     
     <servlet>
         <servlet-name>FrontController</servlet-name>
-        <servlet-class>mg.itu.framework.servlet.FrontController</servlet-class>
+        <servlet-class>itu.framework.servlet.FrontController</servlet-class>
         <init-param>
             <param-name>basePackage</param-name>
             <param-value>mg.itu.test.controller</param-value>
