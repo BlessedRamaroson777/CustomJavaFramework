@@ -97,7 +97,86 @@ public class FrontController extends HttpServlet {
                 // handle return types
                 if (ret instanceof ModelView) {
                     ModelView mv = (ModelView) ret;
+                    // If the controller left some ModelView entries null (e.g. idParam/nameParam)
+                    // try to populate them from request parameters when possible. This makes the
+                    // simple pattern `?id=2&name=Alice` work with views that expect keys like
+                    // "idParam"/"nameParam" even when method args were not bound.
+                    try {
+                        java.lang.reflect.Method getter = mv.getClass().getMethod("getMapData");
+                        Object mapObj = getter.invoke(mv);
+                        if (mapObj instanceof Map) {
+                            @SuppressWarnings("unchecked")
+                            Map<String,Object> map = (Map<String,Object>) mapObj;
+                            // iterate keys snapshot since we may modify the map
+                            java.util.List<String> keys = new java.util.ArrayList<>(map.keySet());
+                            for (String key : keys) {
+                                Object val = map.get(key);
+                                if (val == null && key.endsWith("Param") ) {
+                                    String base = key.substring(0, key.length() - "Param".length());
+                                    String rq = request.getParameter(base);
+                                    if (rq != null && !rq.isEmpty()) {
+                                        Object conv = null;
+                                        try {
+                                            // try integer first, then fallback to string
+                                            conv = convertStringToType(rq, Integer.class);
+                                            if (conv == null) conv = rq;
+                                        } catch (Exception e) { conv = rq; }
+                                        map.put(key, conv);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (NoSuchMethodException nsme) {
+                        // ignore: keep compatibility with ModelView variants
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                     copyModelToRequest(mv, request);
+                    // Build a consolidated boundParams map for the view combining:
+                    // - any parameters previously bound in prepareMethodArgs (request attr "boundParams")
+                    // - direct request parameters (?id=..&name=..)
+                    // - any ModelView mapData entries like idParam/nameParam (expose base names too)
+                    java.util.Map<String,Object> finalBound = new java.util.HashMap<>();
+                    Object existing = request.getAttribute("boundParams");
+                    if (existing instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String,Object> ex = (Map<String,Object>) existing;
+                        finalBound.putAll(ex);
+                    }
+                    // add request parameters (string values)
+                    java.util.Map<String,String[]> rpm = request.getParameterMap();
+                    if (rpm != null) {
+                        for (String k : rpm.keySet()) {
+                            if (!finalBound.containsKey(k)) {
+                                String[] vals = rpm.get(k);
+                                String v = (vals != null && vals.length > 0) ? vals[0] : null;
+                                if (v != null) {
+                                    finalBound.put(k, v);
+                                    try { request.setAttribute(k, v); } catch (Exception e) { }
+                                }
+                            }
+                        }
+                    }
+                    // also expose base names for ModelView keys like idParam -> id
+                    try {
+                        java.lang.reflect.Method getter2 = mv.getClass().getMethod("getMapData");
+                        Object mapObj2 = getter2.invoke(mv);
+                        if (mapObj2 instanceof Map) {
+                            @SuppressWarnings("unchecked")
+                            Map<String,Object> map2 = (Map<String,Object>) mapObj2;
+                            for (String k : map2.keySet()) {
+                                if (k != null && k.endsWith("Param")) {
+                                    String base = k.substring(0, k.length() - "Param".length());
+                                    Object val = map2.get(k);
+                                    if (!finalBound.containsKey(base) && val != null) {
+                                        finalBound.put(base, val);
+                                        try { request.setAttribute(base, val); } catch (Exception e) { }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) { /* ignore */ }
+                    request.setAttribute("boundParams", finalBound);
                     String viewPath = "/WEB-INF/views/" + mv.getView();
                     if (getServletContext().getResource(viewPath) == null) {
                         response.sendError(HttpServletResponse.SC_NOT_FOUND, "Page JSP introuvable : " + mv.getView());
@@ -430,8 +509,8 @@ public class FrontController extends HttpServlet {
         java.lang.reflect.Parameter[] params = method.getParameters();
         Object[] args = new Object[params.length];
         // (no heuristic) no need to track consumed request params
-        // track binding source for each parameter (path / requestName / annotation / indexRoute / heuristic / default)
-        java.util.Map<String, String> bindingSources = new java.util.HashMap<>();
+        // track resolved parameter values to expose to the view
+        java.util.Map<String, Object> resolvedValues = new java.util.HashMap<>();
         for (int pi = 0; pi < params.length; pi++) {
             java.lang.reflect.Parameter p = params[pi];
             String pname = p.getName();
@@ -451,14 +530,12 @@ public class FrontController extends HttpServlet {
             // 1) try path params (prefer exact param name)
             if (pathParams != null && pathParams.containsKey(displayName)) {
                 sval = pathParams.get(displayName);
-                bindingSources.put(displayName, "path");
             }
             // 2) try request parameter by method parameter name
             if ((sval == null || "null".equals(sval) || sval.isEmpty())) {
                 String r = request.getParameter(displayName);
                 if (r != null && !r.isEmpty()) {
                     sval = r;
-                    bindingSources.put(displayName, "requestName");
                 }
             }
             // 3) if annotated with @ReqParam and still not found, try annotation value
@@ -466,13 +543,11 @@ public class FrontController extends HttpServlet {
                 String key = reqAnn.value();
                 if (pathParams != null && pathParams.containsKey(key)) {
                     sval = pathParams.get(key);
-                    bindingSources.put(displayName, "path");
                 }
                 if ((sval == null || "null".equals(sval) || sval.isEmpty())) {
                     String r2 = request.getParameter(key);
                     if (r2 != null && !r2.isEmpty()) {
                         sval = r2;
-                        bindingSources.put(displayName, "annotation");
                     }
                 }
             }
@@ -482,7 +557,6 @@ public class FrontController extends HttpServlet {
                 String pn = paramNames.get(pi);
                 if (pathParams != null && pathParams.containsKey(pn)) {
                     sval = pathParams.get(pn);
-                    bindingSources.put(displayName != null ? displayName : pn, "indexRoute");
                 }
             }
             // No heuristic fallback: only exact name matches, annotation names or route params are accepted.
@@ -491,8 +565,7 @@ public class FrontController extends HttpServlet {
             if (sval != null && !"null".equals(sval) && !sval.isEmpty()) {
                 try {
                     aval = convertStringToType(sval, ptype);
-                        // If we already resolved a binding source earlier, keep it. If none, mark as requestName by default
-                        if (!bindingSources.containsKey(displayName)) bindingSources.put(displayName, "requestName");
+                        // resolved from request or path/annotation/indexRoute
                 } catch (Exception ex) {
                     System.out.println("[FrontController] Warning: cannot convert parameter '" + pname + "' value='" + sval + "' to " + ptype.getName());
                     aval = null;
@@ -504,15 +577,18 @@ public class FrontController extends HttpServlet {
                     else aval = Integer.valueOf(0);
                 } else {
                     aval = null;
-                    // mark as default/unset
-                        if (!bindingSources.containsKey(displayName)) bindingSources.put(displayName, "default");
                 }
             }
                 args[pi] = aval;
-                System.out.println("[FrontController] Resolved param '" + displayName + "' -> " + args[pi] + " (source=" + bindingSources.get(displayName) + ")");
+                // expose to request and record resolved value only when we bound something
+                if (displayName != null && sval != null && !"null".equals(sval) && !sval.isEmpty()) {
+                    resolvedValues.put(displayName, args[pi]);
+                    try { request.setAttribute(displayName, args[pi]); } catch (Exception e) { }
+                }
+                System.out.println("[FrontController] Resolved param '" + displayName + "' -> " + args[pi]);
         }
-        // Expose binding sources map to request so views can display how each parameter was resolved
-        request.setAttribute("bindingSources", bindingSources);
+        // expose all resolved parameter values to the request for the view
+        request.setAttribute("boundParams", resolvedValues);
         return args;
     }
 

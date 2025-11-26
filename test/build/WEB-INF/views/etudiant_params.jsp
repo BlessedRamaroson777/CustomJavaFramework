@@ -11,15 +11,10 @@
     <hr/>
     <h2>Request parameters</h2>
     <p>idParam: <%= request.getAttribute("idParam") != null ? request.getAttribute("idParam") : "(aucun)" %></p>
-    <p>nameParam: <%= request.getAttribute("nameParam") != null ? request.getAttribute("nameParam") : "(aucun)" %></p>
-    <%
-        java.util.Map bs = (java.util.Map) request.getAttribute("bindingSources");
-        String idSource = "(inconnu)";
-        String nameSource = "(inconnu)";
-        if (bs != null) {
-            Object o = bs.get("id"); if (o != null) idSource = o.toString();
-            Object o2 = bs.get("name"); if (o2 != null) nameSource = o2.toString();
-        }
-    %>
+    <p>nameParam: <%= request.getAttribute("nameParam") != null ? request.getAttribute("nameParam") : "(aucun)" %></p>    <hr/>
+    <h3>Debug binding (FrontController)</h3>
+    <p>boundParams: <%= request.getAttribute("boundParams") != null ? request.getAttribute("boundParams") : "(none)" %></p>
+    <p>attribute `id`: <%= request.getAttribute("id") != null ? request.getAttribute("id") : "(none)" %></p>
+    <p>attribute `name`: <%= request.getAttribute("name") != null ? request.getAttribute("name") : "(none)" %></p>
 </body>
 </html>

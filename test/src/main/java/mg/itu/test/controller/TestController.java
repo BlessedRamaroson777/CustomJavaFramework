@@ -105,8 +105,7 @@ public class TestController {
         // 6 - Page fiche détail étudiant : /etudiant/{id}
         ModelView mv = new ModelView();
         mv.setView("etudiant.jsp");
-        mv.addData("studentId", id);
-        mv.addData("message", "Fiche detail etudiant pour id=" + id);
+        // data will be provided by FrontController (bound from path/request)
         return mv;
     }
 
@@ -118,8 +117,7 @@ public class TestController {
         System.out.println("[TestController] etudiantParams() appelee avec id=" + id + " name=" + name);
         ModelView mv = new ModelView();
         mv.setView("etudiant_params.jsp");
-        mv.addData("idParam", id);
-        mv.addData("nameParam", name);
+        // FrontController will expose idParam/nameParam from the request
         return mv;
     }
 
@@ -130,8 +128,7 @@ public class TestController {
         System.out.println("[TestController] etudiantParams() appelee avec id=" + id + " name=" + name);
         ModelView mv = new ModelView();
         mv.setView("etudiant_param2.jsp");
-        mv.addData("idParam", id);
-        mv.addData("nameParam", name);
+        // FrontController will expose idParam/nameParam from the request
         return mv;
     }
 
