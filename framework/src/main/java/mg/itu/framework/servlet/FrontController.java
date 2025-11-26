@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -59,8 +60,9 @@ public class FrontController extends HttpServlet {
             return;
         }
 
-        // Find exact route candidate first; if none, fall back to parameterized route matching
-        RouteMatch match = findExactRoute(path);
+        // Find exact route candidate first (matching HTTP method too); if none, fall back to parameterized route matching
+        String httpMethod = request.getMethod();
+        RouteMatch match = findExactRoute(path, httpMethod);
         if (match == null) {
             match = findBestRoute(path, request);
         }
@@ -124,9 +126,11 @@ public class FrontController extends HttpServlet {
     }
 
     // Find an exact (non-parameterized) route for the path. If none found, return null.
-    private RouteMatch findExactRoute(String path) {
+    private RouteMatch findExactRoute(String path, String httpMethod) {
         for (RouteEntry re : routeEntries) {
             if (re.paramNames != null && !re.paramNames.isEmpty()) continue; // skip parameterized
+            // check allowed methods if present
+            if (re.allowedMethods != null && !re.allowedMethods.isEmpty() && !re.allowedMethods.contains(httpMethod)) continue;
             Matcher m = re.pattern.matcher(path);
             if (m.matches()) {
                 return new RouteMatch(re.handler, new HashMap<>(), re.paramNames);
@@ -245,7 +249,9 @@ public class FrontController extends HttpServlet {
                                     i++;
                                 }
                                 Pattern compiled = Pattern.compile("^" + regex.toString() + "$");
-                                routeEntries.add(new RouteEntry(compiled, paramNames, new MethodHandler(cls, m)));
+                                String[] methods = ann.methods();
+                                List<String> allowed = (methods != null && methods.length > 0) ? Arrays.asList(methods) : null;
+                                routeEntries.add(new RouteEntry(compiled, paramNames, new MethodHandler(cls, m), allowed));
                             }
                         }
                     } catch (ClassNotFoundException e) {
@@ -273,11 +279,13 @@ public class FrontController extends HttpServlet {
         final Pattern pattern;
         final List<String> paramNames;
         final MethodHandler handler;
+        final List<String> allowedMethods; // null or empty = any
 
-        RouteEntry(Pattern pattern, List<String> paramNames, MethodHandler handler) {
+        RouteEntry(Pattern pattern, List<String> paramNames, MethodHandler handler, List<String> allowedMethods) {
             this.pattern = pattern;
             this.paramNames = paramNames;
             this.handler = handler;
+            this.allowedMethods = allowedMethods;
         }
     }
 
@@ -384,6 +392,8 @@ public class FrontController extends HttpServlet {
         RouteMatch best = null;
         int bestScore = Integer.MIN_VALUE;
         for (RouteEntry re : routeEntries) {
+            // check allowed HTTP methods for this route (null/empty = any)
+            if (re.allowedMethods != null && !re.allowedMethods.isEmpty() && !re.allowedMethods.contains(request.getMethod())) continue;
             Matcher m = re.pattern.matcher(path);
             if (!m.matches()) continue;
             Map<String,String> params = new HashMap<>();

@@ -110,12 +110,8 @@ public class TestController {
         return mv;
     }
 
-<<<<<<< Updated upstream
-=======
     @MyURL("/inona/params")
->>>>>>> Stashed changes
     // etudiant/params?id=2&name=Alice
-    @MyURL("/etudiant/params")
     public ModelView etudiantParams(@itu.framework.annotations.ReqParam("id") Integer id,
                                      @itu.framework.annotations.ReqParam("name") String name) {
         // 6 bis - request parameters mapping by name
@@ -137,6 +133,12 @@ public class TestController {
         mv.addData("idParam", id);
         mv.addData("nameParam", name);
         return mv;
+    }
+
+    @MyURL(value = "/hello", methods = {"GET"})
+    public String hello() {
+        System.out.println("[TestController] hello() appelee");
+        return "Hello from TestController (hello)";
     }
 
 }
