@@ -13,6 +13,5 @@
     <h3>Debug binding (FrontController)</h3>
     <p>boundParams: <%= request.getAttribute("boundParams") != null ? request.getAttribute("boundParams") : "(none)" %></p>
     <p>attribute `id`: <%= request.getAttribute("id") != null ? request.getAttribute("id") : "(none)" %></p>
-    <p>attribute `name`: <%= request.getAttribute("name") != null ? request.getAttribute("name") : "(none)" %></p>
 </body>
 </html>

@@ -15,11 +15,6 @@
     <p>boundParams: <%= request.getAttribute("boundParams") != null ? request.getAttribute("boundParams") : "(none)" %></p>
     <p>attribute `id`: <%= request.getAttribute("id") != null ? request.getAttribute("id") : "(none)" %></p>
     <p>attribute `name`: <%= request.getAttribute("name") != null ? request.getAttribute("name") : "(none)" %></p>
-    <p>ModelView mapData entries:</p>
-    <pre>
-        idParam = <%= request.getAttribute("idParam") != null ? request.getAttribute("idParam") : "(aucun)" %>
-        nameParam = <%= request.getAttribute("nameParam") != null ? request.getAttribute("nameParam") : "(aucun)" %>
-    </pre>
-    
+        
 </body>
 </html>
