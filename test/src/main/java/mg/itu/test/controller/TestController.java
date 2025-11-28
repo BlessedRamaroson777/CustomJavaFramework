@@ -138,4 +138,27 @@ public class TestController {
         return "Hello from TestController (hello)";
     }
 
+    // --- test endpoints added for debugging/framework verification ---
+    @MyURL(value = "/student/view", methods = {"GET"})
+    public ModelView studentView() {
+        System.out.println("[TestController] studentView() called");
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        // do not rely on controller to populate data; FrontController may expose request/query params
+        // but provide a default value here to show view when no query provided
+        mv.addData("studentName", "Default Student");
+        return mv;
+    }
+
+    @MyURL(value = "/student/update", methods = {"POST"})
+    public String studentUpdate(@itu.framework.annotations.ReqParam("name") String name) {
+        System.out.println("[TestController] studentUpdate() called with name=" + name);
+        // simulate an update operation (in a real app you'd persist the change)
+        if (name == null || name.isEmpty()) {
+            return "No name provided";
+        }
+        // Return a simple confirmation string
+        return "Student name updated to: " + name;
+    }
+
 }

@@ -23,3 +23,7 @@ aminny formulaire
             etudiantcontroller
             get(int id) associe amin ny url /etudiant/{id}
             de le ao amin ny {id} no aqetaka ao amin ilay get   
+
+sqrint 8
+formulaire mankao amin'ny maq<String, Object> le nom et la valeur et avec 
+request.getqarameter de saver-na ilay izy 
