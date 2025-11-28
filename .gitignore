@@ -1,0 +1,7 @@
+framework/build/framework.jar
+lib/framework.jar
+test/build/TestFramework.war
+test/build/WEB-INF/lib/framework.jar
+test/build/WEB-INF/views/etudiant.jsp
+test/build/WEB-INF/views/etudiant_param2.jsp
+test/build/WEB-INF/views/etudiant_params.jsp
