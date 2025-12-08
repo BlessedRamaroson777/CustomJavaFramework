@@ -133,21 +133,6 @@ public class FrontController extends HttpServlet {
                     }
                     copyModelToRequest(mv, request);
                     
-                    // Automatic form data collection: collect ALL request parameters into a Map<String,Object>
-                    // This map is exposed to the view automatically, no need for manual mv.addData()
-                    java.util.Map<String,Object> formData = new java.util.HashMap<>();
-                    java.util.Map<String,String[]> rpm = request.getParameterMap();
-                    if (rpm != null) {
-                        for (String k : rpm.keySet()) {
-                            String[] vals = rpm.get(k);
-                            String v = (vals != null && vals.length > 0) ? vals[0] : null;
-                            if (v != null) {
-                                formData.put(k, v);
-                            }
-                        }
-                    }
-                    request.setAttribute("formData", formData);
-                    
                     // Build a consolidated boundParams map for the view combining:
                     // - any parameters previously bound in prepareMethodArgs (request attr "boundParams")
                     // - direct request parameters (?id=..&name=..)
@@ -159,10 +144,19 @@ public class FrontController extends HttpServlet {
                         Map<String,Object> ex = (Map<String,Object>) existing;
                         finalBound.putAll(ex);
                     }
-                    // add request parameters
-                    finalBound.putAll(formData);
-                    for (String k : formData.keySet()) {
-                        try { request.setAttribute(k, formData.get(k)); } catch (Exception e) { }
+                    // add request parameters (string values)
+                    java.util.Map<String,String[]> rpm = request.getParameterMap();
+                    if (rpm != null) {
+                        for (String k : rpm.keySet()) {
+                            if (!finalBound.containsKey(k)) {
+                                String[] vals = rpm.get(k);
+                                String v = (vals != null && vals.length > 0) ? vals[0] : null;
+                                if (v != null) {
+                                    finalBound.put(k, v);
+                                    try { request.setAttribute(k, v); } catch (Exception e) { }
+                                }
+                            }
+                        }
                     }
                     // also expose base names for ModelView keys like idParam -> id
                     try {
@@ -520,6 +514,61 @@ public class FrontController extends HttpServlet {
         java.util.Map<String, Object> resolvedValues = new java.util.HashMap<>();
         for (int pi = 0; pi < params.length; pi++) {
             java.lang.reflect.Parameter p = params[pi];
+            Class<?> ptype = p.getType();
+            
+            // SPECIAL CASE 1: If parameter is Map<String, Object>, auto-fill with request params + attributes
+            if (Map.class.isAssignableFrom(ptype)) {
+                java.util.Map<String, Object> autoMap = new java.util.HashMap<>();
+                
+                // Add all request parameters
+                java.util.Map<String,String[]> rpm = request.getParameterMap();
+                if (rpm != null) {
+                    for (String k : rpm.keySet()) {
+                        String[] vals = rpm.get(k);
+                        String v = (vals != null && vals.length > 0) ? vals[0] : null;
+                        if (v != null) {
+                            autoMap.put(k, v);
+                        }
+                    }
+                }
+                
+                // Add all request attributes
+                java.util.Enumeration<String> attrNames = request.getAttributeNames();
+                while (attrNames.hasMoreElements()) {
+                    String attrName = attrNames.nextElement();
+                    Object attrValue = request.getAttribute(attrName);
+                    // Avoid overwriting and skip internal attributes
+                    if (!autoMap.containsKey(attrName) && !attrName.startsWith("javax.") && !attrName.startsWith("org.")) {
+                        autoMap.put(attrName, attrValue);
+                    }
+                }
+                
+                args[pi] = autoMap;
+                System.out.println("[FrontController] Auto-filled Map parameter with " + autoMap.size() + " entries: " + autoMap.keySet());
+                continue; // Skip normal parameter binding for this Map parameter
+            }
+            
+            // SPECIAL CASE 2: If parameter is a custom object (not primitive, not String, not Map), auto-populate from form fields
+            if (!ptype.isPrimitive() && !ptype.equals(String.class) && !ptype.equals(Integer.class) && 
+                !ptype.equals(Long.class) && !ptype.equals(Double.class) && !ptype.equals(Float.class) &&
+                !ptype.equals(Boolean.class) && !ptype.getName().startsWith("java.") && !Map.class.isAssignableFrom(ptype)) {
+                
+                String pname = p.getName();
+                // Get parameter name (e.g., "e" for Employe e)
+                String objPrefix = pname;
+                if (pname == null || pname.startsWith("arg")) {
+                    objPrefix = ptype.getSimpleName().toLowerCase().substring(0, 1); // Default: first letter of class
+                }
+                
+                // Try to populate the object from request parameters like "e.name", "e.email", etc.
+                Object populatedObj = populateObjectFromRequest(ptype, objPrefix, request);
+                if (populatedObj != null) {
+                    args[pi] = populatedObj;
+                    System.out.println("[FrontController] Auto-populated object " + objPrefix + " of type " + ptype.getSimpleName());
+                    continue;
+                }
+            }
+            
             String pname = p.getName();
             // determine a stable, human-friendly name to expose to views
             String displayName = pname;
@@ -567,7 +616,6 @@ public class FrontController extends HttpServlet {
                 }
             }
             // No heuristic fallback: only exact name matches, annotation names or route params are accepted.
-            Class<?> ptype = p.getType();
             Object aval = null;
             if (sval != null && !"null".equals(sval) && !sval.isEmpty()) {
                 try {
@@ -627,6 +675,157 @@ public class FrontController extends HttpServlet {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Populate an object from request parameters with notation like "e.name", "e.email", "e.department[0].name"
+     * @param objClass The class of the object to create and populate
+     * @param prefix The prefix used in form field names (e.g., "e" for "e.name")
+     * @param request The HTTP request containing the parameters
+     * @return A populated instance of the object, or null if no matching parameters found
+     */
+    private Object populateObjectFromRequest(Class<?> objClass, String prefix, HttpServletRequest request) {
+        try {
+            // Create a new instance of the object
+            Object obj = objClass.getDeclaredConstructor().newInstance();
+            java.util.Map<String, String[]> paramMap = request.getParameterMap();
+            boolean hasData = false;
+            
+            // Iterate through all request parameters
+            for (String paramName : paramMap.keySet()) {
+                // Check if parameter starts with prefix (e.g., "e.")
+                if (paramName.startsWith(prefix + ".")) {
+                    hasData = true;
+                    String fieldPath = paramName.substring(prefix.length() + 1); // Remove "e."
+                    String[] values = paramMap.get(paramName);
+                    String value = (values != null && values.length > 0) ? values[0] : null;
+                    
+                    if (value != null && !value.isEmpty()) {
+                        // Handle nested properties and arrays: "department[0].name"
+                        setNestedProperty(obj, fieldPath, value);
+                    }
+                }
+            }
+            
+            return hasData ? obj : null;
+        } catch (Exception e) {
+            System.err.println("[FrontController] Error populating object of type " + objClass.getName() + ": " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Set a nested property on an object, supporting array/list notation
+     * Examples: "name" -> setName(), "department[0].name" -> getDepartment()[0].setName()
+     */
+    private void setNestedProperty(Object obj, String fieldPath, String value) throws Exception {
+        if (obj == null || fieldPath == null || fieldPath.isEmpty()) return;
+        
+        // Check if fieldPath contains array notation: "department[0].name"
+        int bracketPos = fieldPath.indexOf('[');
+        if (bracketPos > 0) {
+            // Handle array/list access
+            String arrayField = fieldPath.substring(0, bracketPos); // "department"
+            int closeBracket = fieldPath.indexOf(']', bracketPos);
+            if (closeBracket > bracketPos) {
+                String indexStr = fieldPath.substring(bracketPos + 1, closeBracket); // "0"
+                int index = Integer.parseInt(indexStr);
+                
+                // Get the array/list from the object
+                String getterName = "get" + capitalize(arrayField);
+                java.lang.reflect.Method getter = findMethod(obj.getClass(), getterName);
+                if (getter != null) {
+                    Object arrayOrList = getter.invoke(obj);
+                    
+                    // If null, create a new list
+                    if (arrayOrList == null) {
+                        if (getter.getReturnType().isArray()) {
+                            // Create array - we'll handle this later
+                            System.out.println("[FrontController] Warning: Array field '" + arrayField + "' is null, skipping");
+                            return;
+                        } else if (List.class.isAssignableFrom(getter.getReturnType())) {
+                            arrayOrList = new java.util.ArrayList<>();
+                            String setterName = "set" + capitalize(arrayField);
+                            java.lang.reflect.Method setter = findMethod(obj.getClass(), setterName, List.class);
+                            if (setter != null) {
+                                setter.invoke(obj, arrayOrList);
+                            }
+                        }
+                    }
+                    
+                    // Ensure list has enough elements
+                    if (arrayOrList instanceof List) {
+                        @SuppressWarnings("unchecked")
+                        List<Object> list = (List<Object>) arrayOrList;
+                        while (list.size() <= index) {
+                            // Try to instantiate the element type
+                            // For now, we'll just add null and handle it below
+                            list.add(null);
+                        }
+                        
+                        // Check if there's more path after the array index
+                        if (closeBracket + 1 < fieldPath.length() && fieldPath.charAt(closeBracket + 1) == '.') {
+                            String remainingPath = fieldPath.substring(closeBracket + 2); // "name"
+                            Object element = list.get(index);
+                            
+                            // If element is null, try to create it
+                            if (element == null) {
+                                // Try to determine the element type from the getter
+                                java.lang.reflect.Type returnType = getter.getGenericReturnType();
+                                if (returnType instanceof java.lang.reflect.ParameterizedType) {
+                                    java.lang.reflect.ParameterizedType pType = (java.lang.reflect.ParameterizedType) returnType;
+                                    java.lang.reflect.Type[] typeArgs = pType.getActualTypeArguments();
+                                    if (typeArgs.length > 0 && typeArgs[0] instanceof Class) {
+                                        Class<?> elementClass = (Class<?>) typeArgs[0];
+                                        element = elementClass.getDeclaredConstructor().newInstance();
+                                        list.set(index, element);
+                                    }
+                                }
+                            }
+                            
+                            if (element != null) {
+                                setNestedProperty(element, remainingPath, value);
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Simple property: "name", "email", etc.
+            String setterName = "set" + capitalize(fieldPath);
+            
+            // Find the setter method
+            java.lang.reflect.Method setter = null;
+            for (java.lang.reflect.Method m : obj.getClass().getMethods()) {
+                if (m.getName().equals(setterName) && m.getParameterCount() == 1) {
+                    setter = m;
+                    break;
+                }
+            }
+            
+            if (setter != null) {
+                Class<?> paramType = setter.getParameterTypes()[0];
+                Object convertedValue = convertStringToType(value, paramType);
+                setter.invoke(obj, convertedValue);
+                System.out.println("[FrontController] Set " + fieldPath + " = " + value + " on " + obj.getClass().getSimpleName());
+            } else {
+                System.out.println("[FrontController] Warning: No setter found for " + fieldPath + " on " + obj.getClass().getSimpleName());
+            }
+        }
+    }
+
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) return str;
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+
+    private java.lang.reflect.Method findMethod(Class<?> clazz, String methodName, Class<?>... paramTypes) {
+        try {
+            return clazz.getMethod(methodName, paramTypes);
+        } catch (NoSuchMethodException e) {
+            return null;
         }
     }
 }

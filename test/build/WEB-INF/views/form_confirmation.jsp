@@ -6,7 +6,7 @@
     <title>Confirmation - Formulaire Soumis</title>
 </head>
 <body>
-    <h1>Formulaire Soumis avec Succès</h1>
+    <h1>Formulaire Soumis avec Succes</h1>
     
     <div class="success-box">
         <%= request.getAttribute("message") != null ? request.getAttribute("message") : "Données enregistrées!" %>
@@ -15,10 +15,10 @@
     <h2>Données collectées et sauvegardées (Map&lt;String, Object&gt;)</h2>
     
     <% 
-        // Le framework expose automatiquement formData depuis request.getParameterMap()
-        Object formDataObj = request.getAttribute("formData");
-        if (formDataObj instanceof java.util.Map) {
-            java.util.Map<?, ?> formData = (java.util.Map<?, ?>) formDataObj;
+        // Le Map est auto-rempli par le framework quand la méthode du contrôleur a un paramètre Map
+        Object savedDataObj = request.getAttribute("savedData");
+        if (savedDataObj instanceof java.util.Map) {
+            java.util.Map<?, ?> savedData = (java.util.Map<?, ?>) savedDataObj;
     %>
     <table>
         <thead>
@@ -29,7 +29,7 @@
             </tr>
         </thead>
         <tbody>
-            <% for (java.util.Map.Entry<?, ?> entry : formData.entrySet()) { 
+            <% for (java.util.Map.Entry<?, ?> entry : savedData.entrySet()) { 
                 String typeName = entry.getValue() != null ? entry.getValue().getClass().getSimpleName() : "null";
             %>
             <tr>
@@ -43,10 +43,10 @@
     <% } else { %>
         <p>Aucune donnée disponible.</p>
     <% } %>
-    
+<%--     
     <hr/>
     <h3>Console log (vérifiez la console du serveur)</h3>
-    <p>Les données ont été affichées dans la console avec <code>System.out.println()</code> simulant une opération "save".</p>
+    <p>Les données ont été affichées dans la console avec <code>System.out.println()</code> simulant une opération "save".</p> --%>
     
     <hr/>
     <h3>Debug info (FrontController)</h3>

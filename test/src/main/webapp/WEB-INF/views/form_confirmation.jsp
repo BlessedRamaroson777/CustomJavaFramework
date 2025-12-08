@@ -15,10 +15,10 @@
     <h2>Données collectées et sauvegardées (Map&lt;String, Object&gt;)</h2>
     
     <% 
-        // Le framework expose automatiquement formData depuis request.getParameterMap()
-        Object formDataObj = request.getAttribute("formData");
-        if (formDataObj instanceof java.util.Map) {
-            java.util.Map<?, ?> formData = (java.util.Map<?, ?>) formDataObj;
+        // Le Map est auto-rempli par le framework quand la méthode du contrôleur a un paramètre Map
+        Object savedDataObj = request.getAttribute("savedData");
+        if (savedDataObj instanceof java.util.Map) {
+            java.util.Map<?, ?> savedData = (java.util.Map<?, ?>) savedDataObj;
     %>
     <table>
         <thead>
@@ -29,7 +29,7 @@
             </tr>
         </thead>
         <tbody>
-            <% for (java.util.Map.Entry<?, ?> entry : formData.entrySet()) { 
+            <% for (java.util.Map.Entry<?, ?> entry : savedData.entrySet()) { 
                 String typeName = entry.getValue() != null ? entry.getValue().getClass().getSimpleName() : "null";
             %>
             <tr>
