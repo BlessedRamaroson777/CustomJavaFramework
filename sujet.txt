@@ -27,6 +27,3 @@ aminny formulaire
 sqrint 8
 formulaire mankao amin'ny maq<String, Object> le nom et la valeur et avec 
 request.getqarameter de saver-na ilay izy 
-
-echec x qing qong
-misy vie ny qion ary tsy voatery hitovy et configurable raha voakitika balon indray de -1

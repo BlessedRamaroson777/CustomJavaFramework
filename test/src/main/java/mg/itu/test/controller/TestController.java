@@ -211,8 +211,63 @@ public class TestController {
         return mv;
     }
 
-    public void saveEmploye(Employe[] es, Departement d, int deptId) {
-        // Future implementation for array handling
+    @MyURL(value = "/objet/multi", methods = {"GET"})
+    public ModelView showMultiForm() {
+        System.out.println("[TestController] showMultiForm() called");
+        ModelView mv = new ModelView();
+        mv.setView("employe_multi.jsp");
+        return mv;
+    }
+
+    @MyURL(value = "/objet/multi", methods = {"POST"})
+    public ModelView saveEmploye(Employe[] es, Departement d, int deptId) {
+        System.out.println("[TestController] saveEmploye(array) called");
+        System.out.println("[TestController] Employés reçus: " + (es != null ? es.length : 0));
+        if (es != null) {
+            for (int i = 0; i < es.length; i++) {
+                System.out.println("  [" + i + "] " + es[i]);
+            }
+        }
+        System.out.println("[TestController] Département reçu: " + d);
+        System.out.println("[TestController] DeptId: " + deptId);
+        
+        ModelView mv = new ModelView();
+        mv.setView("employe_multi_confirmation.jsp");
+        mv.addData("employes", es);
+        mv.addData("departement", d);
+        mv.addData("deptId", deptId);
+        mv.addData("message", "Données enregistrées avec succès!");
+        return mv;
+    }
+
+    // Sprint 9 - API JSON avec @Json
+    @MyURL(value = "/api/employe/{id}", methods = {"GET"})
+    @itu.framework.annotations.Json
+    public Employe getEmployeJson(int id) {
+        System.out.println("[TestController] getEmployeJson() called with id=" + id);
+        // Simulation de récupération depuis base de données
+        Employe e = new Employe(id, "Rakoto", "Jean", "jean.rakoto@example.com", 3500.50, 1);
+        return e;
+    }
+
+    @MyURL(value = "/api/employes", methods = {"GET"})
+    @itu.framework.annotations.Json
+    public java.util.List<Employe> listEmployesJson() {
+        System.out.println("[TestController] listEmployesJson() called");
+        // Simulation de récupération de liste
+        java.util.List<Employe> list = new java.util.ArrayList<>();
+        list.add(new Employe(1, "Rakoto", "Jean", "jean@example.com", 3500.50, 1));
+        list.add(new Employe(2, "Rabe", "Marie", "marie@example.com", 4200.00, 2));
+        list.add(new Employe(3, "Rasoa", "Paul", "paul@example.com", 3800.75, 1));
+        return list;
+    }
+
+    @MyURL(value = "/api/departement/{id}", methods = {"GET"})
+    @itu.framework.annotations.Json(status = 200, message = "OK")
+    public Departement getDepartementJson(int id) {
+        System.out.println("[TestController] getDepartementJson() called with id=" + id);
+        Departement d = new Departement(id, "IT Department", "Antananarivo");
+        return d;
     }
 
 }

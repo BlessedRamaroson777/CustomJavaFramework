@@ -94,6 +94,21 @@ public class FrontController extends HttpServlet {
                     throw iae;
                 }
 
+                // Check if method is annotated with @Json
+                if (mh.method.isAnnotationPresent(itu.framework.annotations.Json.class)) {
+                    itu.framework.annotations.Json jsonAnn = mh.method.getAnnotation(itu.framework.annotations.Json.class);
+                    int statusCode = jsonAnn.status();
+                    String statusMessage = jsonAnn.message();
+                    
+                    // Convert return value to JSON response
+                    String jsonResponse = convertToJsonResponse(ret, statusCode, statusMessage);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.setStatus(statusCode);
+                    response.getWriter().write(jsonResponse);
+                    return;
+                }
+
                 // handle return types
                 if (ret instanceof ModelView) {
                     ModelView mv = (ModelView) ret;
@@ -548,8 +563,28 @@ public class FrontController extends HttpServlet {
                 continue; // Skip normal parameter binding for this Map parameter
             }
             
-            // SPECIAL CASE 2: If parameter is a custom object (not primitive, not String, not Map), auto-populate from form fields
-            if (!ptype.isPrimitive() && !ptype.equals(String.class) && !ptype.equals(Integer.class) && 
+            // SPECIAL CASE 2: If parameter is an array of custom objects, auto-populate from form fields
+            if (ptype.isArray() && !ptype.getComponentType().isPrimitive() && 
+                !ptype.getComponentType().equals(String.class) && 
+                !ptype.getComponentType().getName().startsWith("java.")) {
+                
+                String pname = p.getName();
+                String arrayPrefix = pname;
+                if (pname == null || pname.startsWith("arg")) {
+                    arrayPrefix = ptype.getComponentType().getSimpleName().toLowerCase().substring(0, 1) + "s";
+                }
+                
+                // Try to populate array from request parameters like "es[0].name", "es[1].name", etc.
+                Object populatedArray = populateArrayFromRequest(ptype.getComponentType(), arrayPrefix, request);
+                if (populatedArray != null) {
+                    args[pi] = populatedArray;
+                    System.out.println("[FrontController] Auto-populated array " + arrayPrefix + " of type " + ptype.getComponentType().getSimpleName() + "[]");
+                    continue;
+                }
+            }
+            
+            // SPECIAL CASE 3: If parameter is a custom object (not primitive, not String, not Map), auto-populate from form fields
+            if (!ptype.isPrimitive() && !ptype.isArray() && !ptype.equals(String.class) && !ptype.equals(Integer.class) && 
                 !ptype.equals(Long.class) && !ptype.equals(Double.class) && !ptype.equals(Float.class) &&
                 !ptype.equals(Boolean.class) && !ptype.getName().startsWith("java.") && !Map.class.isAssignableFrom(ptype)) {
                 
@@ -675,6 +710,78 @@ public class FrontController extends HttpServlet {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Populate an array of objects from request parameters with notation like "es[0].name", "es[1].email"
+     * @param componentClass The class of array elements
+     * @param prefix The prefix used in form field names (e.g., "es" for "es[0].name")
+     * @param request The HTTP request containing the parameters
+     * @return A populated array, or null if no matching parameters found
+     */
+    private Object populateArrayFromRequest(Class<?> componentClass, String prefix, HttpServletRequest request) {
+        try {
+            java.util.Map<String, String[]> paramMap = request.getParameterMap();
+            
+            // First, find the maximum index in the array
+            int maxIndex = -1;
+            for (String paramName : paramMap.keySet()) {
+                // Check for pattern like "es[0].something"
+                if (paramName.startsWith(prefix + "[")) {
+                    int closeBracket = paramName.indexOf(']');
+                    if (closeBracket > 0) {
+                        try {
+                            String indexStr = paramName.substring(prefix.length() + 1, closeBracket);
+                            int index = Integer.parseInt(indexStr);
+                            if (index > maxIndex) {
+                                maxIndex = index;
+                            }
+                        } catch (NumberFormatException e) {
+                            // Ignore invalid index
+                        }
+                    }
+                }
+            }
+            
+            if (maxIndex < 0) {
+                return null; // No array elements found
+            }
+            
+            // Create array with size maxIndex + 1
+            Object array = java.lang.reflect.Array.newInstance(componentClass, maxIndex + 1);
+            
+            // Populate each element
+            for (int i = 0; i <= maxIndex; i++) {
+                Object element = componentClass.getDeclaredConstructor().newInstance();
+                boolean hasData = false;
+                
+                String elementPrefix = prefix + "[" + i + "]";
+                
+                // Find all parameters for this array element
+                for (String paramName : paramMap.keySet()) {
+                    if (paramName.startsWith(elementPrefix + ".")) {
+                        hasData = true;
+                        String fieldPath = paramName.substring(elementPrefix.length() + 1); // Remove "es[0]."
+                        String[] values = paramMap.get(paramName);
+                        String value = (values != null && values.length > 0) ? values[0] : null;
+                        
+                        if (value != null && !value.isEmpty()) {
+                            setNestedProperty(element, fieldPath, value);
+                        }
+                    }
+                }
+                
+                if (hasData) {
+                    java.lang.reflect.Array.set(array, i, element);
+                }
+            }
+            
+            return array;
+        } catch (Exception e) {
+            System.err.println("[FrontController] Error populating array of type " + componentClass.getName() + "[]: " + e.getMessage());
+            e.printStackTrace();
+            return null;
         }
     }
 
@@ -827,5 +934,135 @@ public class FrontController extends HttpServlet {
         } catch (NoSuchMethodException e) {
             return null;
         }
+    }
+
+    /**
+     * Convert a return value to JSON response with standard format:
+     * { "status": "success", "code": 200, "data": {...} }
+     */
+    private String convertToJsonResponse(Object data, int code, String status) {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        json.append("\"status\":").append(quote(status)).append(",");
+        json.append("\"code\":").append(code).append(",");
+        json.append("\"data\":");
+        
+        if (data == null) {
+            json.append("null");
+        } else if (data instanceof List || data.getClass().isArray()) {
+            // Data is a list or array -> use []
+            json.append(toJsonArray(data));
+        } else {
+            // Data is an object -> use {}
+            json.append(toJsonObject(data));
+        }
+        
+        json.append("}");
+        return json.toString();
+    }
+
+    /**
+     * Convert object to JSON object notation {...}
+     */
+    private String toJsonObject(Object obj) {
+        if (obj == null) return "null";
+        
+        // Handle primitive types and wrappers
+        if (obj instanceof String) return quote((String) obj);
+        if (obj instanceof Number || obj instanceof Boolean) return obj.toString();
+        
+        // Handle Map
+        if (obj instanceof Map) {
+            StringBuilder json = new StringBuilder("{");
+            Map<?, ?> map = (Map<?, ?>) obj;
+            boolean first = true;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!first) json.append(",");
+                json.append(quote(String.valueOf(entry.getKey()))).append(":");
+                json.append(toJsonValue(entry.getValue()));
+                first = false;
+            }
+            json.append("}");
+            return json.toString();
+        }
+        
+        // Handle custom objects using reflection
+        StringBuilder json = new StringBuilder("{");
+        boolean first = true;
+        try {
+            for (java.lang.reflect.Method method : obj.getClass().getMethods()) {
+                String methodName = method.getName();
+                if ((methodName.startsWith("get") || methodName.startsWith("is")) 
+                    && method.getParameterCount() == 0 
+                    && !methodName.equals("getClass")) {
+                    
+                    String fieldName = methodName.startsWith("get") 
+                        ? methodName.substring(3) 
+                        : methodName.substring(2);
+                    fieldName = fieldName.substring(0, 1).toLowerCase() + fieldName.substring(1);
+                    
+                    Object value = method.invoke(obj);
+                    if (!first) json.append(",");
+                    json.append(quote(fieldName)).append(":");
+                    json.append(toJsonValue(value));
+                    first = false;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[FrontController] Error converting object to JSON: " + e.getMessage());
+        }
+        json.append("}");
+        return json.toString();
+    }
+
+    /**
+     * Convert list/array to JSON array notation [...]
+     */
+    private String toJsonArray(Object data) {
+        StringBuilder json = new StringBuilder("[");
+        boolean first = true;
+        
+        if (data instanceof List) {
+            List<?> list = (List<?>) data;
+            for (Object item : list) {
+                if (!first) json.append(",");
+                json.append(toJsonValue(item));
+                first = false;
+            }
+        } else if (data.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(data);
+            for (int i = 0; i < length; i++) {
+                if (!first) json.append(",");
+                Object item = java.lang.reflect.Array.get(data, i);
+                json.append(toJsonValue(item));
+                first = false;
+            }
+        }
+        
+        json.append("]");
+        return json.toString();
+    }
+
+    /**
+     * Convert any value to JSON representation
+     */
+    private String toJsonValue(Object value) {
+        if (value == null) return "null";
+        if (value instanceof String) return quote((String) value);
+        if (value instanceof Number || value instanceof Boolean) return value.toString();
+        if (value instanceof List || value.getClass().isArray()) return toJsonArray(value);
+        return toJsonObject(value);
+    }
+
+    /**
+     * Quote a string for JSON
+     */
+    private String quote(String str) {
+        if (str == null) return "\"\"";
+        return "\"" + str.replace("\\", "\\\\")
+                         .replace("\"", "\\\"")
+                         .replace("\n", "\\n")
+                         .replace("\r", "\\r")
+                         .replace("\t", "\\t") + "\"";
     }
 }
