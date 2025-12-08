@@ -30,7 +30,7 @@ public class ModelView {
     public void setMapData(HashMap<String, Object> mapData) {
         this.mapData = mapData;
     }
-
+    
     // Compatibilité : alias pour anciennes versions / différents usages
     public Map<String, Object> getMaqData() {
         return mapData;

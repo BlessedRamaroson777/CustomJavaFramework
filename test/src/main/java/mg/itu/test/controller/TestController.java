@@ -161,4 +161,33 @@ public class TestController {
         return "Student name updated to: " + name;
     }
 
+    @MyURL(value = "/form", methods = {"GET"})
+    public ModelView showForm() {
+        System.out.println("[TestController] showForm() called");
+        ModelView mv = new ModelView();
+        mv.setView("student_form.jsp");
+        return mv;
+    }
+
+    @MyURL(value = "/form/submit", methods = {"POST"})
+    public ModelView submitForm(
+            @itu.framework.annotations.ReqParam("nom") String nom,
+            @itu.framework.annotations.ReqParam("prenom") String prenom,
+            @itu.framework.annotations.ReqParam("age") Integer age,
+            @itu.framework.annotations.ReqParam("email") String email) {
+        System.out.println("[TestController] submitForm() called");
+        
+        // Le framework collecte automatiquement tous les paramètres dans formData
+        // Plus besoin de créer manuellement le Map et faire des put()
+        
+        // Simulation de sauvegarde
+        System.out.println("[TestController] Form submitted - data auto-collected by framework");
+        
+        // Return confirmation view
+        ModelView mv = new ModelView();
+        mv.setView("form_confirmation.jsp");
+        mv.addData("message", "Formulaire soumis avec succès!");
+        return mv;
+    }
+
 }

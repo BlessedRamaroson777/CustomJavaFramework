@@ -24,5 +24,12 @@
     <% } else { %>
         <p>Aucune donnée de modèle disponible.</p>
     <% } %>
+    <h2>Update student</h2>
+    <form action="/TestFramework/student/update" method="post">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" />
+        <br/>
+        <button type="submit">Save</button>
+    </form>
 </body>
 </html>
