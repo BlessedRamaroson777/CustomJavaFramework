@@ -6,7 +6,7 @@
     <title>Confirmation - Employe Enregistre</title>
 </head>
 <body>
-    <h1>✓ Employe Enregistre avec Succès</h1>
+    <h1>Employe Enregistre avec Succes</h1>
     
     <div class="success-box">
         <%= request.getAttribute("message") != null ? request.getAttribute("message") : "Donnees enregistrees!" %>
