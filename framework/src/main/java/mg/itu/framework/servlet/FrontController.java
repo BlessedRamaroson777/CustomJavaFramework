@@ -132,6 +132,22 @@ public class FrontController extends HttpServlet {
                         e.printStackTrace();
                     }
                     copyModelToRequest(mv, request);
+                    
+                    // Automatic form data collection: collect ALL request parameters into a Map<String,Object>
+                    // This map is exposed to the view automatically, no need for manual mv.addData()
+                    java.util.Map<String,Object> formData = new java.util.HashMap<>();
+                    java.util.Map<String,String[]> rpm = request.getParameterMap();
+                    if (rpm != null) {
+                        for (String k : rpm.keySet()) {
+                            String[] vals = rpm.get(k);
+                            String v = (vals != null && vals.length > 0) ? vals[0] : null;
+                            if (v != null) {
+                                formData.put(k, v);
+                            }
+                        }
+                    }
+                    request.setAttribute("formData", formData);
+                    
                     // Build a consolidated boundParams map for the view combining:
                     // - any parameters previously bound in prepareMethodArgs (request attr "boundParams")
                     // - direct request parameters (?id=..&name=..)
@@ -143,19 +159,10 @@ public class FrontController extends HttpServlet {
                         Map<String,Object> ex = (Map<String,Object>) existing;
                         finalBound.putAll(ex);
                     }
-                    // add request parameters (string values)
-                    java.util.Map<String,String[]> rpm = request.getParameterMap();
-                    if (rpm != null) {
-                        for (String k : rpm.keySet()) {
-                            if (!finalBound.containsKey(k)) {
-                                String[] vals = rpm.get(k);
-                                String v = (vals != null && vals.length > 0) ? vals[0] : null;
-                                if (v != null) {
-                                    finalBound.put(k, v);
-                                    try { request.setAttribute(k, v); } catch (Exception e) { }
-                                }
-                            }
-                        }
+                    // add request parameters
+                    finalBound.putAll(formData);
+                    for (String k : formData.keySet()) {
+                        try { request.setAttribute(k, formData.get(k)); } catch (Exception e) { }
                     }
                     // also expose base names for ModelView keys like idParam -> id
                     try {
