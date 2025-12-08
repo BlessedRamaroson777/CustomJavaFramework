@@ -6,6 +6,7 @@ import itu.framework.annotations.MyController;
 import itu.framework.annotations.MyURL;
 import itu.framework.scan.ControllerScanner;
 import itu.framework.ModelView;
+import mg.itu.test.model.*;
 
 @MyController("TestController")
 public class TestController {
@@ -138,6 +139,7 @@ public class TestController {
         return "Hello from TestController (hello)";
     }
 
+    // sprint 7
     // --- test endpoints added for debugging/framework verification ---
     @MyURL(value = "/student/view", methods = {"GET"})
     public ModelView studentView() {
@@ -161,6 +163,7 @@ public class TestController {
         return "Student name updated to: " + name;
     }
 
+    // sprint 8
     @MyURL(value = "/form", methods = {"GET"})
     public ModelView showForm() {
         System.out.println("[TestController] showForm() called");
@@ -170,24 +173,46 @@ public class TestController {
     }
 
     @MyURL(value = "/form/submit", methods = {"POST"})
-    public ModelView submitForm(
-            @itu.framework.annotations.ReqParam("nom") String nom,
-            @itu.framework.annotations.ReqParam("prenom") String prenom,
-            @itu.framework.annotations.ReqParam("age") Integer age,
-            @itu.framework.annotations.ReqParam("email") String email) {
+    public ModelView submitForm(java.util.Map<String, Object> formData) {
         System.out.println("[TestController] submitForm() called");
-        
-        // Le framework collecte automatiquement tous les paramètres dans formData
-        // Plus besoin de créer manuellement le Map et faire des put()
-        
+                
         // Simulation de sauvegarde
-        System.out.println("[TestController] Form submitted - data auto-collected by framework");
+        System.out.println("[TestController] Saving data: " + formData);
         
         // Return confirmation view
         ModelView mv = new ModelView();
         mv.setView("form_confirmation.jsp");
+        mv.addData("savedData", formData);
         mv.addData("message", "Formulaire soumis avec succès!");
         return mv;
+    }
+
+    // sprint 8 bis - Object binding from form
+    @MyURL(value = "/objet", methods = {"GET"})
+    public ModelView showEmployeForm() {
+        System.out.println("[TestController] showEmployeForm() called");
+        ModelView mv = new ModelView();
+        mv.setView("employe.jsp");
+        return mv;
+    }
+
+    @MyURL(value = "/objet", methods = {"POST"})
+    public ModelView saveEmploye(Employe e) {
+        System.out.println("[TestController] saveEmploye() called");
+        System.out.println("[TestController] Employe reçu: " + e);
+        
+        // Simulation de sauvegarde
+        System.out.println("[TestController] Saving employe: " + e);
+        
+        ModelView mv = new ModelView();
+        mv.setView("employe_confirmation.jsp");
+        mv.addData("employe", e);
+        mv.addData("message", "Employé enregistré avec succès!");
+        return mv;
+    }
+
+    public void saveEmploye(Employe[] es, Departement d, int deptId) {
+        // Future implementation for array handling
     }
 
 }
