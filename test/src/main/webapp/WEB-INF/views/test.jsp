@@ -6,6 +6,7 @@
     <title>Page Test</title>
 </head>
 <body>
+    <h1 align="center">ETU003326</h1>
     <h1>Test Page</h1>
     <p>Cette page est affichee via ModelView !</p>
     <p>URL demandee : <%= request.getRequestURI() %></p>

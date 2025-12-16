@@ -6,6 +6,7 @@
     <title>Confirmation - Formulaire Soumis</title>
 </head>
 <body>
+    <h1 align="center">ETU003326</h1>
     <h1>Formulaire Soumis avec Succes</h1>
     
     <div class="success-box">

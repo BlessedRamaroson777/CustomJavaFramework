@@ -6,6 +6,7 @@
     <title>Formulaire Employe</title>
 </head>
 <body>
+    <h1 align="center">ETU003326</h1>
     <h1>Sprint 8bis - Binding d'objet depuis formulaire</h1>
     
     <form action="<%= request.getContextPath() %>/objet" method="POST">

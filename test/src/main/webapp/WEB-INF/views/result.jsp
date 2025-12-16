@@ -6,6 +6,7 @@
     <title>Resultat</title>
 </head>
 <body>
+    <h1 align="center">ETU003326</h1>
     <h1>Framework MrNaina - Resultat</h1>
     <pre><%= request.getAttribute("result") %></pre>
 </body>

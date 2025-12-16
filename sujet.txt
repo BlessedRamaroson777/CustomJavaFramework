@@ -27,3 +27,7 @@ aminny formulaire
 sqrint 8
 formulaire mankao amin'ny maq<String, Object> le nom et la valeur et avec 
 request.getqarameter de saver-na ilay izy 
+
+sqrint10 
+uqload fichier via formulaire ahoana no hahatonga an iny any amin ny controller code d action
+satria iny any amin ny view
