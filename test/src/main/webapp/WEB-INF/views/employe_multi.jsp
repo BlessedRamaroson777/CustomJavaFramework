@@ -6,6 +6,7 @@
     <title>Formulaire Multiple - Employes</title>
 </head>
 <body>
+    <h1 align="center">ETU003326</h1>
     <h1>Sprint 8bis - Binding multiple objets et tableaux</h1>
     
     <form action="<%= request.getContextPath() %>/objet/multi" method="POST">

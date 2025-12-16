@@ -3,30 +3,18 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Confirmation - Données Multiples</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
-        h1 { color: #4CAF50; }
-        .success-box { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #4CAF50; color: white; }
-        tr:hover { background-color: #f5f5f5; }
-        .section { margin: 30px 0; }
-        .dept-table th { background-color: #2196F3; }
-        a { color: #4CAF50; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
+    <title>Confirmation - Donnees Multiples</title>
 </head>
 <body>
-    <h1>✓ Données Enregistrées avec Succès</h1>
+    <h1 align="center">ETU003326</h1>
+    <h1>✓ Donnees Enregistrees avec Succes</h1>
     
     <div class="success-box">
-        <%= request.getAttribute("message") != null ? request.getAttribute("message") : "Données enregistrées!" %>
+        <%= request.getAttribute("message") != null ? request.getAttribute("message") : "Donnees enregistrees!" %>
     </div>
     
     <div class="section">
-        <h2>Employés (Tableau Employe[])</h2>
+        <h2>Employes (Tableau Employe[])</h2>
         <% 
             Object employesObj = request.getAttribute("employes");
             if (employesObj != null && employesObj instanceof mg.itu.test.model.Employe[]) {
@@ -37,7 +25,7 @@
                 <tr>
                     <th>#</th>
                     <th>Nom</th>
-                    <th>Prénom</th>
+                    <th>Prenom</th>
                     <th>Email</th>
                     <th>Salaire</th>
                     <th>Dept ID</th>
@@ -62,12 +50,12 @@
             </tbody>
         </table>
         <% } else { %>
-            <p>Aucun employé.</p>
+            <p>Aucun employe.</p>
         <% } %>
     </div>
     
     <div class="section">
-        <h2>Département (Objet Departement)</h2>
+        <h2>Departement (Objet Departement)</h2>
         <% 
             Object deptObj = request.getAttribute("departement");
             if (deptObj != null && deptObj instanceof mg.itu.test.model.Departement) {
@@ -76,7 +64,7 @@
         <table class="dept-table">
             <thead>
                 <tr>
-                    <th>Propriété</th>
+                    <th>Propriete</th>
                     <th>Valeur</th>
                 </tr>
             </thead>
@@ -100,7 +88,7 @@
             </tbody>
         </table>
         <% } else { %>
-            <p>Aucun département.</p>
+            <p>Aucun departement.</p>
         <% } %>
     </div>
     

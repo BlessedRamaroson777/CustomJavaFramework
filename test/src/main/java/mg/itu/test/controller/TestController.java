@@ -1,6 +1,7 @@
 package mg.itu.test.controller;
 
 import java.util.List;
+import javax.servlet.http.Part;
 
 import itu.framework.annotations.MyController;
 import itu.framework.annotations.MyURL;
@@ -10,13 +11,13 @@ import mg.itu.test.model.*;
 
 @MyController("TestController")
 public class TestController {
-    
+
     @MyURL("/index")
     public String index() {
         System.out.println("[TestController] index() appelee");
         return "Hello from Test Controller!";
     }
-    
+
     @MyURL("/test")
     public String test() {
         System.out.println("[TestController] test() appelee");
@@ -34,12 +35,12 @@ public class TestController {
 
         return sb.toString();
     }
-    
+
     @MyURL("/void-test")
     public void voidMethod() {
         System.out.println("[TestController] voidMethod() appelee - ne retourne rien");
     }
-    
+
     @MyURL("/page-test")
     public ModelView pageTest() {
         System.out.println("[TestController] pageTest() appelee - retourne ModelView");
@@ -47,7 +48,7 @@ public class TestController {
         mv.setView("test.jsp");
         return mv;
     }
-    
+
     @MyURL("/page-inexistante")
     public ModelView pageInexistante() {
         System.out.println("[TestController] pageInexistante() appelee - retourne ModelView avec page qui existe pas");
@@ -69,9 +70,15 @@ public class TestController {
                 add = mv.getClass().getMethod("addData", String.class, Object.class);
             } catch (NoSuchMethodException ex) {
                 // try common overloads
-                try { add = mv.getClass().getMethod("addData", String.class, String.class); } catch (NoSuchMethodException e) {}
+                try {
+                    add = mv.getClass().getMethod("addData", String.class, String.class);
+                } catch (NoSuchMethodException e) {
+                }
                 if (add == null) {
-                    try { add = mv.getClass().getMethod("addData", String.class, int.class); } catch (NoSuchMethodException e) {}
+                    try {
+                        add = mv.getClass().getMethod("addData", String.class, int.class);
+                    } catch (NoSuchMethodException e) {
+                    }
                 }
             }
             if (add != null) {
@@ -113,7 +120,7 @@ public class TestController {
     @MyURL("/inona/params")
     // etudiant/params?id=2&name=Alice
     public ModelView etudiantParams(@itu.framework.annotations.ReqParam("id") Integer id,
-                                     @itu.framework.annotations.ReqParam("name") String name) {
+            @itu.framework.annotations.ReqParam("name") String name) {
         // 6 bis - request parameters mapping by name
         System.out.println("[TestController] etudiantParams() appelee avec id=" + id + " name=" + name);
         ModelView mv = new ModelView();
@@ -133,7 +140,7 @@ public class TestController {
         return mv;
     }
 
-    @MyURL(value = "/hello", methods = {"GET"})
+    @MyURL(value = "/hello", methods = { "GET" })
     public String hello() {
         System.out.println("[TestController] hello() appelee");
         return "Hello from TestController (hello)";
@@ -141,18 +148,19 @@ public class TestController {
 
     // sprint 7
     // --- test endpoints added for debugging/framework verification ---
-    @MyURL(value = "/student/view", methods = {"GET"})
+    @MyURL(value = "/student/view", methods = { "GET" })
     public ModelView studentView() {
         System.out.println("[TestController] studentView() called");
         ModelView mv = new ModelView();
         mv.setView("test.jsp");
-        // do not rely on controller to populate data; FrontController may expose request/query params
+        // do not rely on controller to populate data; FrontController may expose
+        // request/query params
         // but provide a default value here to show view when no query provided
         mv.addData("studentName", "Default Student");
         return mv;
     }
 
-    @MyURL(value = "/student/update", methods = {"POST"})
+    @MyURL(value = "/student/update", methods = { "POST" })
     public String studentUpdate(@itu.framework.annotations.ReqParam("name") String name) {
         System.out.println("[TestController] studentUpdate() called with name=" + name);
         // simulate an update operation (in a real app you'd persist the change)
@@ -164,7 +172,7 @@ public class TestController {
     }
 
     // sprint 8
-    @MyURL(value = "/form", methods = {"GET"})
+    @MyURL(value = "/form", methods = { "GET" })
     public ModelView showForm() {
         System.out.println("[TestController] showForm() called");
         ModelView mv = new ModelView();
@@ -172,13 +180,13 @@ public class TestController {
         return mv;
     }
 
-    @MyURL(value = "/form/submit", methods = {"POST"})
+    @MyURL(value = "/form/submit", methods = { "POST" })
     public ModelView submitForm(java.util.Map<String, Object> formData) {
         System.out.println("[TestController] submitForm() called");
-                
+
         // Simulation de sauvegarde
         System.out.println("[TestController] Saving data: " + formData);
-        
+
         // Return confirmation view
         ModelView mv = new ModelView();
         mv.setView("form_confirmation.jsp");
@@ -187,8 +195,33 @@ public class TestController {
         return mv;
     }
 
+    // --- file upload example ---
+    @MyURL(value = "/upload", methods = { "GET" })
+    public ModelView showUploadForm() {
+        System.out.println("[TestController] showUploadForm() called");
+        ModelView mv = new ModelView();
+        mv.setView("upload_form.jsp");
+        return mv;
+    }
+
+    @MyURL(value = "/upload", methods = { "POST" })
+    public ModelView handleUpload(@itu.framework.annotations.ReqParam("files") Part[] files) {
+        System.out.println("[TestController] handleUpload() called");
+        java.util.List<String> names = new java.util.ArrayList<>();
+        if (files != null) {
+            for (Part p : files) {
+                if (p != null)
+                    names.add(p.getSubmittedFileName());
+            }
+        }
+        ModelView mv = new ModelView();
+        mv.setView("upload_result.jsp");
+        mv.addData("files", names);
+        return mv;
+    }
+
     // sprint 8 bis - Object binding from form
-    @MyURL(value = "/objet", methods = {"GET"})
+    @MyURL(value = "/objet", methods = { "GET" })
     public ModelView showEmployeForm() {
         System.out.println("[TestController] showEmployeForm() called");
         ModelView mv = new ModelView();
@@ -196,14 +229,14 @@ public class TestController {
         return mv;
     }
 
-    @MyURL(value = "/objet", methods = {"POST"})
+    @MyURL(value = "/objet", methods = { "POST" })
     public ModelView saveEmploye(Employe e) {
         System.out.println("[TestController] saveEmploye() called");
         System.out.println("[TestController] Employe reçu: " + e);
-        
+
         // Simulation de sauvegarde
         System.out.println("[TestController] Saving employe: " + e);
-        
+
         ModelView mv = new ModelView();
         mv.setView("employe_confirmation.jsp");
         mv.addData("employe", e);
@@ -211,7 +244,7 @@ public class TestController {
         return mv;
     }
 
-    @MyURL(value = "/objet/multi", methods = {"GET"})
+    @MyURL(value = "/objet/multi", methods = { "GET" })
     public ModelView showMultiForm() {
         System.out.println("[TestController] showMultiForm() called");
         ModelView mv = new ModelView();
@@ -219,7 +252,7 @@ public class TestController {
         return mv;
     }
 
-    @MyURL(value = "/objet/multi", methods = {"POST"})
+    @MyURL(value = "/objet/multi", methods = { "POST" })
     public ModelView saveEmploye(Employe[] es, Departement d, int deptId) {
         System.out.println("[TestController] saveEmploye(array) called");
         System.out.println("[TestController] Employés reçus: " + (es != null ? es.length : 0));
@@ -230,7 +263,7 @@ public class TestController {
         }
         System.out.println("[TestController] Département reçu: " + d);
         System.out.println("[TestController] DeptId: " + deptId);
-        
+
         ModelView mv = new ModelView();
         mv.setView("employe_multi_confirmation.jsp");
         mv.addData("employes", es);
@@ -241,7 +274,7 @@ public class TestController {
     }
 
     // Sprint 9 - API JSON avec @Json
-    @MyURL(value = "/api/employe/{id}", methods = {"GET"})
+    @MyURL(value = "/api/employe/{id}", methods = { "GET" })
     @itu.framework.annotations.Json
     public Employe getEmployeJson(int id) {
         System.out.println("[TestController] getEmployeJson() called with id=" + id);
@@ -250,7 +283,7 @@ public class TestController {
         return e;
     }
 
-    @MyURL(value = "/api/employes", methods = {"GET"})
+    @MyURL(value = "/api/employes", methods = { "GET" })
     @itu.framework.annotations.Json
     public java.util.List<Employe> listEmployesJson() {
         System.out.println("[TestController] listEmployesJson() called");
@@ -262,7 +295,7 @@ public class TestController {
         return list;
     }
 
-    @MyURL(value = "/api/departement/{id}", methods = {"GET"})
+    @MyURL(value = "/api/departement/{id}", methods = { "GET" })
     @itu.framework.annotations.Json(status = 200, message = "OK")
     public Departement getDepartementJson(int id) {
         System.out.println("[TestController] getDepartementJson() called with id=" + id);

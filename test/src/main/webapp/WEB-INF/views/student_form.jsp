@@ -6,6 +6,7 @@
     <title>Formulaire Etudiant</title>
 </head>
 <body>
+    <h1 align="center">ETU003326</h1>
     <h1>Formulaire Etudiant</h1>
     <p>Remplissez le formulaire ci-dessous. Les données seront collectées dans un Map&lt;String, Object&gt; et "sauvegardées" (simulation).</p>
     

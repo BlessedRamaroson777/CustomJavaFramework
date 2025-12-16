@@ -6,6 +6,7 @@
     <title>Etudiant - Request Params (variant 2)</title>
 </head>
 <body>
+    <h1 align="center">ETU003326</h1>
     <h1>Etudiant - Request Params (variant 2)</h1>
     <p>URL demandee : <%= request.getRequestURI() %></p>
     <hr/>
