@@ -23,6 +23,7 @@ import java.io.InputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import itu.framework.ModelView;
 
@@ -685,6 +686,48 @@ public class FrontController extends HttpServlet {
         for (int pi = 0; pi < params.length; pi++) {
             java.lang.reflect.Parameter p = params[pi];
             Class<?> ptype = p.getType();
+
+            // SPECIAL CASE: If parameter is annotated with @Session
+            itu.framework.annotations.Session sessionAnn = p.getAnnotation(itu.framework.annotations.Session.class);
+            if (sessionAnn != null) {
+                HttpSession session = request.getSession();
+                String key = sessionAnn.value();
+                
+                if (key != null && !key.isEmpty()) {
+                    // Retrieve specific attribute from session by key
+                    Object sessionValue = session.getAttribute(key);
+                    args[pi] = sessionValue;
+                    resolvedValues.put(key, sessionValue);
+                    System.out.println("[FrontController] Injected session attribute '" + key + "' -> " + sessionValue);
+                } else if (ptype.equals(HttpSession.class) || ptype.getName().equals("javax.servlet.http.HttpSession")) {
+                    // Inject the whole HttpSession object
+                    args[pi] = session;
+                    System.out.println("[FrontController] Injected HttpSession");
+                } else if (Map.class.isAssignableFrom(ptype)) {
+                    // Inject session attributes as Map<String, Object>
+                    java.util.Map<String, Object> sessionMap = new java.util.HashMap<>();
+                    java.util.Enumeration<String> attrNames = session.getAttributeNames();
+                    while (attrNames.hasMoreElements()) {
+                        String attrName = attrNames.nextElement();
+                        Object attrValue = session.getAttribute(attrName);
+                        sessionMap.put(attrName, attrValue);
+                    }
+                    args[pi] = sessionMap;
+                    System.out.println("[FrontController] Injected session as Map with " + sessionMap.size() + " entries: " + sessionMap.keySet());
+                } else {
+                    // Try to inject first session attribute if type matches
+                    java.util.Enumeration<String> attrNames = session.getAttributeNames();
+                    if (attrNames.hasMoreElements()) {
+                        String firstKey = attrNames.nextElement();
+                        Object firstValue = session.getAttribute(firstKey);
+                        if (firstValue != null && ptype.isAssignableFrom(firstValue.getClass())) {
+                            args[pi] = firstValue;
+                            System.out.println("[FrontController] Injected session attribute '" + firstKey + "' (type matched)");
+                        }
+                    }
+                }
+                continue;
+            }
 
             // SPECIAL CASE 1: If parameter is Map<String, Object>, auto-fill with request
             // params + attributes
