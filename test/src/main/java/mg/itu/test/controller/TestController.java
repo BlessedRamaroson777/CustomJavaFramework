@@ -2,6 +2,7 @@ package mg.itu.test.controller;
 
 import java.util.List;
 import javax.servlet.http.Part;
+import javax.servlet.http.HttpSession;
 
 import itu.framework.annotations.MyController;
 import itu.framework.annotations.MyURL;
@@ -301,6 +302,137 @@ public class TestController {
         System.out.println("[TestController] getDepartementJson() called with id=" + id);
         Departement d = new Departement(id, "IT Department", "Antananarivo");
         return d;
+    }
+
+    // Sprint 10 - Session Management avec @Session
+    
+    /**
+     * Exemple 1: Injecter toute la session comme Map<String, Object>
+     * URL: /session/map
+     */
+    @MyURL(value = "/session/map", methods = { "GET" })
+    public ModelView sessionMap(@itu.framework.annotations.Session java.util.Map<String, Object> session) {
+        System.out.println("[TestController] sessionMap() called");
+        System.out.println("[TestController] Session content: " + session);
+        
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        mv.addData("message", "Session data retrieved");
+        mv.addData("sessionData", session);
+        return mv;
+    }
+
+    /**
+     * Exemple 2: Stocker des données en session
+     * URL: /session/set?name=value
+     */
+    @MyURL(value = "/session/set", methods = { "GET" })
+    public ModelView sessionSet(@itu.framework.annotations.ReqParam("name") String name,
+                                @itu.framework.annotations.ReqParam("value") String value,
+                                @itu.framework.annotations.Session javax.servlet.http.HttpSession session) {
+        System.out.println("[TestController] sessionSet() called with name=" + name + " value=" + value);
+        
+        // Stocker dans la session
+        if (session != null && name != null && value != null) {
+            session.setAttribute(name, value);
+            System.out.println("[TestController] Stored in session: " + name + " = " + value);
+        }
+        
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        mv.addData("message", "Data stored in session: " + name + " = " + value);
+        return mv;
+    }
+
+    /**
+     * Exemple 3: Récupérer une valeur spécifique de la session
+     * URL: /session/get/username (récupère l'attribut 'username' de la session)
+     */
+    @MyURL(value = "/session/get/{attr}", methods = { "GET" })
+    public ModelView sessionGet(@itu.framework.annotations.ReqParam("attr") String attr,
+                                @itu.framework.annotations.Session("username") String username) {
+        System.out.println("[TestController] sessionGet() called for attr=" + attr);
+        System.out.println("[TestController] Username from session: " + username);
+        
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        mv.addData("attribute", attr);
+        mv.addData("value", username);
+        mv.addData("message", "Retrieved '" + attr + "' from session");
+        return mv;
+    }
+
+    /**
+     * Exemple 4: Page de login qui stocke le user en session
+     * URL: /session/login?username=John&password=secret
+     */
+    @MyURL(value = "/session/login", methods = { "POST", "GET" })
+    public ModelView sessionLogin(@itu.framework.annotations.ReqParam("username") String username,
+                                  @itu.framework.annotations.ReqParam("password") String password,
+                                  @itu.framework.annotations.Session javax.servlet.http.HttpSession session) {
+        System.out.println("[TestController] sessionLogin() called with username=" + username);
+        
+        // Simulation de vérification de login
+        if (username != null && password != null && !username.isEmpty() && !password.isEmpty()) {
+            // Stocker l'utilisateur en session
+            session.setAttribute("username", username);
+            session.setAttribute("isLoggedIn", true);
+            session.setAttribute("loginTime", new java.util.Date().toString());
+            
+            ModelView mv = new ModelView();
+            mv.setView("test.jsp");
+            mv.addData("message", "Login successful! Welcome " + username);
+            mv.addData("username", username);
+            return mv;
+        } else {
+            ModelView mv = new ModelView();
+            mv.setView("test.jsp");
+            mv.addData("message", "Login failed: invalid credentials");
+            return mv;
+        }
+    }
+
+    /**
+     * Exemple 5: Vérifier si l'utilisateur est connecté
+     * URL: /session/check
+     */
+    @MyURL(value = "/session/check", methods = { "GET" })
+    public ModelView sessionCheck(@itu.framework.annotations.Session("username") String username,
+                                  @itu.framework.annotations.Session("isLoggedIn") Boolean isLoggedIn) {
+        System.out.println("[TestController] sessionCheck() called");
+        System.out.println("[TestController] Username: " + username + ", IsLoggedIn: " + isLoggedIn);
+        
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        
+        if (isLoggedIn != null && isLoggedIn && username != null) {
+            mv.addData("message", "You are logged in as: " + username);
+            mv.addData("status", "authenticated");
+        } else {
+            mv.addData("message", "You are not logged in");
+            mv.addData("status", "guest");
+        }
+        
+        return mv;
+    }
+
+    /**
+     * Exemple 6: Logout - supprimer la session
+     * URL: /session/logout
+     */
+    @MyURL(value = "/session/logout", methods = { "GET", "POST" })
+    public ModelView sessionLogout(@itu.framework.annotations.Session javax.servlet.http.HttpSession session) {
+        System.out.println("[TestController] sessionLogout() called");
+        
+        if (session != null) {
+            session.invalidate();
+            System.out.println("[TestController] Session invalidated");
+        }
+        
+        ModelView mv = new ModelView();
+        mv.setView("test.jsp");
+        mv.addData("message", "You have been logged out successfully");
+        return mv;
     }
 
 }

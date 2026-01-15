@@ -5,7 +5,7 @@ set WEB_DIR=src\main\webapp
 set BUILD_DIR=build
 set LIB_DIR=..\lib
 set TOMCAT_WEBAPPS=C:\xampp\tomcat\webapps
-set SERVLET_API_JA`R=%LIB_DIR%\servlet-api.jar
+set SERVLET_API_JAR=%LIB_DIR%\servlet-api.jar
 set FRAMEWORK_JAR=%LIB_DIR%\framework.jar
 
 REM Suppression et recreation du dossier build
